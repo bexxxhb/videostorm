@@ -25,3 +25,6 @@ Also we will create a frontend application to present the stored informations.
 
 - Make the plan extremely concise. Sacrifice grammar for the sake of concision.
 - At the end of each plan, give me a list of unresolved questions to answer, if any.
+
+
+see `.claude/rules/` for additional specific rules
