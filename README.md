@@ -40,8 +40,18 @@ The code follows a hexagonal (ports and adapters) arrangement with a DDD domain 
 de.videostorm
 ├── config                              Spring wiring that belongs to no single slice
 └── catalogue
-    └── adapter.in.web                  HTTP entry points, rendered with Pug4j
+    ├── domain                          Movie, Show and value objects; no framework dependencies
+    ├── application                     Use-case services (ListMoviesService, ListShowsService, ...)
+    │   └── port
+    │       ├── in                      Query interfaces the adapters call into the application
+    │       └── out                     Repository interfaces the application calls out through
+    └── adapter
+        ├── in.web                      HTTP entry points (controllers), rendered with Pug4j
+        └── out.persistence             JPA entities and repository adapters
 ```
+
+Templates live under `src/main/resources/templates` (`layout.pug`, `movies.pug`, `shows.pug`),
+with static assets in `src/main/resources/static`.
 
 Schema changes are Flyway migrations under `src/main/resources/db/migration`. Hibernate never
 generates DDL.
