@@ -6,15 +6,17 @@ searchable listings. The scope lives in GitHub issue #1 of `bexxxhb/videostorm`.
 ## Running it
 
 ```bash
-docker compose up --build
+VIDEOSTORM_ADMIN_USERNAME=admin VIDEOSTORM_ADMIN_PASSWORD=change-me docker compose up --build
 ```
 
 Then open <http://localhost:8080>. The database is `postgres:17-alpine`; its data lives in the
 named volume `pgdata` and survives `docker compose down`. Use `docker compose down -v` to discard
 the catalogue.
 
-Overridable via the environment (or a `.env` file): `POSTGRES_DB`, `POSTGRES_USER`,
-`POSTGRES_PASSWORD`.
+`VIDEOSTORM_ADMIN_USERNAME` and `VIDEOSTORM_ADMIN_PASSWORD` are required — they log in to the
+`/maintenance` area — and have no default; compose refuses to start without them. The password is
+BCrypted once at startup and never logged. `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` are
+overridable the same way (via the environment or a `.env` file) and do have defaults.
 
 ## Developing
 
@@ -30,7 +32,9 @@ Unit and web-slice tests (`*Test`) need no database.
 
 Running the application outside of compose expects PostgreSQL on `localhost:5432` with database,
 user and password all set to `videostorm`; override with the usual `SPRING_DATASOURCE_*`
-properties.
+properties. It also needs `VIDEOSTORM_ADMIN_USERNAME` and `VIDEOSTORM_ADMIN_PASSWORD` in the
+environment (or `videostorm.admin.username` / `videostorm.admin.password` as JVM properties) —
+startup fails, naming the missing one, if either is absent.
 
 ## Layout
 

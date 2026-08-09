@@ -12,6 +12,9 @@ body {
 }
 
 .masthead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
     padding: 1rem 1.5rem;
     border-bottom: 1px solid var(--rule);
 }
@@ -21,6 +24,11 @@ body {
     font-weight: 600;
     text-decoration: none;
     color: var(--ink);
+}
+
+.masthead__link {
+    text-decoration: none;
+    color: var(--accent);
 }
 
 .tabs {
@@ -96,4 +104,44 @@ body {
 
 .pagination__link--disabled {
     color: var(--rule);
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: 20rem;
+    margin-bottom: 1.5rem;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.field input {
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--rule);
+}
+
+.button {
+    padding: 0.45rem 0.9rem;
+    border: 1px solid var(--rule);
+    background: #f4f4f4;
+    cursor: pointer;
+    align-self: flex-start;
+}
+
+.button:disabled {
+    color: var(--rule);
+    cursor: not-allowed;
+}
+
+.form__error {
+    color: #a12727;
+}
+
+.trigger {
+    margin-bottom: 1.5rem;
 }

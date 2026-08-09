@@ -1,0 +1,15 @@
+extends layout
+
+block content
+  h1 Sign in
+  if loginFailed
+    p.form__error Invalid username or password.
+  form.form(method="post", action="/login")
+    input(type="hidden", name=csrfParameterName, value=csrfToken)
+    label.field
+      span Username
+      input(type="text", name="username", autofocus)
+    label.field
+      span Password
+      input(type="password", name="password")
+    button.button(type="submit") Sign in

@@ -1,12 +1,16 @@
 package de.videostorm.catalogue.adapter.in.web;
 
+import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.catalogue.application.MoviePage;
 import de.videostorm.catalogue.application.port.in.ListMoviesQuery;
 import de.videostorm.config.PugViewConfiguration;
+import de.videostorm.config.security.AdminUserDetailsService;
+import de.videostorm.config.security.SecurityConfig;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -22,10 +26,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Fast, DB-free coverage of the web adapter: routing, the query-parameter pass-through and the
  * pagination-link algebra, with {@link ListMoviesQuery} mocked. The fixed sort, seeded columns,
  * zebra rendering and actual search matching are covered against a real database by
- * {@link MovieListingIT}.
+ * {@link MovieListingIT}. {@link SecurityConfig} is imported so this slice proves the route
+ * stays public under the real filter chain, not just in the absence of one.
  */
 @WebMvcTest(MovieListingController.class)
-@Import(PugViewConfiguration.class)
+@Import({PugViewConfiguration.class, SecurityConfig.class, AdminUserDetailsService.class})
+@TestPropertySource(properties = {
+        "videostorm.admin.username=" + PostgresIntegrationTestBase.ADMIN_USERNAME,
+        "videostorm.admin.password=" + PostgresIntegrationTestBase.ADMIN_PASSWORD
+})
 class MovieListingControllerTest {
 
     @Autowired

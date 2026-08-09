@@ -1,0 +1,19 @@
+extends layout
+
+block content
+  h1 Maintenance
+  form.form(method="post", action="/logout")
+    input(type="hidden", name=csrfParameterName, value=csrfToken)
+    button.button(type="submit") Log out
+
+  section.trigger
+    h2 Movies
+    form.form(method="post", action="/maintenance/movies/reindex")
+      input(type="hidden", name=csrfParameterName, value=csrfToken)
+      button.button(type="submit", disabled) Re-index movies
+
+  section.trigger
+    h2 Shows
+    form.form(method="post", action="/maintenance/shows/reindex")
+      input(type="hidden", name=csrfParameterName, value=csrfToken)
+      button.button(type="submit", disabled) Re-index shows
