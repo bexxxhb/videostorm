@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: videostorm
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/videostorm
+    username: videostorm
+    password: videostorm
+
+  # Flyway owns the schema; Hibernate must never touch it.
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+
+server:
+  port: 8080
+
+logging:
+  level:
+    de.videostorm: INFO

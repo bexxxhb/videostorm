@@ -1,0 +1,9 @@
+-- Baseline of the videostorm schema.
+--
+-- Nothing is catalogued yet: the aggregate tables arrive with the read paths that need them
+-- (movie with the movie listing, show and episode with the show listing, indexing_run with the
+-- import lifecycle). This migration exists so that every environment — local, containerised and
+-- Testcontainers — starts from one Flyway-managed history rather than from an unversioned
+-- database, and so the very first deployment has a version to baseline against.
+--
+-- Deliberately empty: it establishes the history, it does not create objects.

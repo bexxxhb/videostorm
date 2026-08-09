@@ -1,0 +1,2 @@
+# Enable auto-env with: sdk env install
+java=21.0.12-zulu
