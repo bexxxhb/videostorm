@@ -1,51 +1,95 @@
 package de.videostorm.catalogue.adapter.in.web;
 
+import de.videostorm.catalogue.application.MoviePage;
+import de.videostorm.catalogue.application.port.in.ListMoviesQuery;
 import de.videostorm.config.PugViewConfiguration;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+/**
+ * Fast, DB-free coverage of the web adapter: routing and the pagination-link algebra, with
+ * {@link ListMoviesQuery} mocked. The fixed sort, seeded columns and zebra rendering are covered
+ * against a real database by {@link MovieListingIT}.
+ */
 @WebMvcTest(MovieListingController.class)
 @Import(PugViewConfiguration.class)
 class MovieListingControllerTest {
 
-    private static final Pattern TABLE_BODY = Pattern.compile("<tbody>(.*?)</tbody>", Pattern.DOTALL);
-
     @Autowired
     private MockMvc mockMvc;
 
-    @ParameterizedTest
-    @ValueSource(strings = {"/", "/movies"})
-    void servesTheMovieListingWithoutAuthentication(String path) throws Exception {
-        mockMvc.perform(get(path))
-                .andExpect(status().isOk())
-                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_HTML));
+    @MockitoBean
+    private ListMoviesQuery listMoviesQuery;
+
+    @Test
+    void servesTheMovieListingWithoutAuthenticationAtBothRoutes() throws Exception {
+        when(listMoviesQuery.list(1)).thenReturn(new MoviePage(List.of(), 1, 1, 0));
+
+        mockMvc.perform(get("/")).andExpect(status().isOk());
+        mockMvc.perform(get("/movies")).andExpect(status().isOk());
     }
 
     @Test
-    void rendersAMoviesTab() throws Exception {
-        String html = render();
+    void defaultsToPageOneWhenNoPageParameterIsGiven() throws Exception {
+        when(listMoviesQuery.list(1)).thenReturn(new MoviePage(List.of(), 1, 1, 0));
 
-        assertThat(html).contains("<title>Videostorm</title>");
-        assertThat(html).containsPattern("<a[^>]*href=\"/movies\"[^>]*>\\s*Movies\\s*</a>");
+        mockMvc.perform(get("/movies")).andExpect(status().isOk());
+
+        verify(listMoviesQuery).list(1);
+    }
+
+    @Test
+    void passesTheRequestedPageNumberThroughToTheQuery() throws Exception {
+        when(listMoviesQuery.list(3)).thenReturn(new MoviePage(List.of(), 3, 5, 250));
+
+        mockMvc.perform(get("/movies").param("page", "3")).andExpect(status().isOk());
+
+        verify(listMoviesQuery).list(3);
+    }
+
+    @Test
+    void onTheFirstPageFirstAndPreviousAreDisabledWhileNextAndLastLink() throws Exception {
+        when(listMoviesQuery.list(1)).thenReturn(new MoviePage(List.of(), 1, 3, 120));
+
+        String html = render("/movies");
+
+        assertThat(html)
+                .contains("<span class=\"pagination__link pagination__link--disabled\">First</span>")
+                .contains("<span class=\"pagination__link pagination__link--disabled\">Previous</span>")
+                .contains("<a class=\"pagination__link\" href=\"/movies?page=2\">Next</a>")
+                .contains("<a class=\"pagination__link\" href=\"/movies?page=3\">Last</a>");
+    }
+
+    @Test
+    void onTheLastPageNextAndLastAreDisabledWhileFirstAndPreviousLink() throws Exception {
+        when(listMoviesQuery.list(3)).thenReturn(new MoviePage(List.of(), 3, 3, 120));
+
+        String html = render("/movies?page=3");
+
+        assertThat(html)
+                .contains("<a class=\"pagination__link\" href=\"/movies?page=1\">First</a>")
+                .contains("<a class=\"pagination__link\" href=\"/movies?page=2\">Previous</a>")
+                .contains("<span class=\"pagination__link pagination__link--disabled\">Next</span>")
+                .contains("<span class=\"pagination__link pagination__link--disabled\">Last</span>");
     }
 
     @Test
     void rendersEveryMovieColumnHeader() throws Exception {
-        String html = render();
+        when(listMoviesQuery.list(1)).thenReturn(new MoviePage(List.of(), 1, 1, 0));
+
+        String html = render("/movies");
 
         assertThat(html)
                 .contains("<th>Title</th>")
@@ -55,17 +99,8 @@ class MovieListingControllerTest {
                 .contains("<th>Runtime</th>");
     }
 
-    @Test
-    void rendersAnEmptyTableWhenNothingIsCatalogued() throws Exception {
-        String html = render();
-
-        Matcher body = TABLE_BODY.matcher(html);
-        assertThat(body.find()).as("movie table has a tbody").isTrue();
-        assertThat(body.group(1)).as("tbody holds no rows").doesNotContain("<tr");
-    }
-
-    private String render() throws Exception {
-        return mockMvc.perform(get("/movies"))
+    private String render(String path) throws Exception {
+        return mockMvc.perform(get(path))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()

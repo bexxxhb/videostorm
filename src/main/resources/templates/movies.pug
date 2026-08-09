@@ -10,3 +10,29 @@ block content
         th Genres
         th Runtime
     tbody
+      each movie in movies
+        tr(class=movie.rowClass)
+          td= movie.title
+          td= movie.year
+          td= movie.ratingDisplay
+          td(title=movie.genresFullText)= movie.genresDisplay
+          td= movie.runtimeDisplay
+
+  nav.pagination
+    if pagination.firstPageUrl
+      a.pagination__link(href=pagination.firstPageUrl) First
+    else
+      span.pagination__link.pagination__link--disabled First
+    if pagination.previousPageUrl
+      a.pagination__link(href=pagination.previousPageUrl) Previous
+    else
+      span.pagination__link.pagination__link--disabled Previous
+    span.pagination__status Page #{pageNumber} of #{totalPages} (#{totalElements} total)
+    if pagination.nextPageUrl
+      a.pagination__link(href=pagination.nextPageUrl) Next
+    else
+      span.pagination__link.pagination__link--disabled Next
+    if pagination.lastPageUrl
+      a.pagination__link(href=pagination.lastPageUrl) Last
+    else
+      span.pagination__link.pagination__link--disabled Last
