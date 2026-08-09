@@ -2,8 +2,8 @@ package de.videostorm.catalogue.application.port.in;
 
 import de.videostorm.catalogue.application.MoviePage;
 
-/** Inbound port for the movie listing. Page numbers are 1-based. */
+/** Inbound port for the movie listing. Page numbers are 1-based; {@code query} is the raw search box input. */
 public interface ListMoviesQuery {
 
-    MoviePage list(int pageNumber);
+    MoviePage list(int pageNumber, String query);
 }

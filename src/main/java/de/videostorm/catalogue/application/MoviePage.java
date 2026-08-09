@@ -4,7 +4,8 @@ import de.videostorm.catalogue.domain.Movie;
 
 import java.util.List;
 
-public record MoviePage(List<Movie> movies, int pageNumber, int totalPages, long totalElements) {
+/** {@code query} is the trimmed, raw search box input that produced this page — echoed back into the search box and pagination links. */
+public record MoviePage(List<Movie> movies, int pageNumber, int totalPages, long totalElements, String query) {
 
     public boolean hasPrevious() {
         return pageNumber > 1;

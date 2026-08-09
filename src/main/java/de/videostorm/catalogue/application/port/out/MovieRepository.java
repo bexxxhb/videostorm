@@ -1,6 +1,7 @@
 package de.videostorm.catalogue.application.port.out;
 
 import de.videostorm.catalogue.domain.Movie;
+import de.videostorm.catalogue.domain.SearchTerm;
 
 import java.util.List;
 
@@ -10,8 +11,12 @@ import java.util.List;
  */
 public interface MovieRepository {
 
-    long count();
+    /** Movies matching {@code searchTerm}, or every movie when it's blank. */
+    long count(SearchTerm searchTerm);
 
-    /** Returns one page, fixed-sorted by normalized title, then year, then id. {@code pageNumber} is 1-based. */
-    List<Movie> findPage(int pageNumber, int pageSize);
+    /**
+     * Returns one page of movies matching {@code searchTerm} (every movie when it's blank),
+     * fixed-sorted by normalized title, then year, then id. {@code pageNumber} is 1-based.
+     */
+    List<Movie> findPage(SearchTerm searchTerm, int pageNumber, int pageSize);
 }

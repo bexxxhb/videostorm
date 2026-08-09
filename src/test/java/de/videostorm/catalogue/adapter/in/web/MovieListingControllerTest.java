@@ -19,9 +19,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Fast, DB-free coverage of the web adapter: routing and the pagination-link algebra, with
- * {@link ListMoviesQuery} mocked. The fixed sort, seeded columns and zebra rendering are covered
- * against a real database by {@link MovieListingIT}.
+ * Fast, DB-free coverage of the web adapter: routing, the query-parameter pass-through and the
+ * pagination-link algebra, with {@link ListMoviesQuery} mocked. The fixed sort, seeded columns,
+ * zebra rendering and actual search matching are covered against a real database by
+ * {@link MovieListingIT}.
  */
 @WebMvcTest(MovieListingController.class)
 @Import(PugViewConfiguration.class)
@@ -35,33 +36,51 @@ class MovieListingControllerTest {
 
     @Test
     void servesTheMovieListingWithoutAuthenticationAtBothRoutes() throws Exception {
-        when(listMoviesQuery.list(1)).thenReturn(new MoviePage(List.of(), 1, 1, 0));
+        when(listMoviesQuery.list(1, "")).thenReturn(new MoviePage(List.of(), 1, 1, 0, ""));
 
         mockMvc.perform(get("/")).andExpect(status().isOk());
         mockMvc.perform(get("/movies")).andExpect(status().isOk());
     }
 
     @Test
-    void defaultsToPageOneWhenNoPageParameterIsGiven() throws Exception {
-        when(listMoviesQuery.list(1)).thenReturn(new MoviePage(List.of(), 1, 1, 0));
+    void defaultsToPageOneAndNoQueryWhenNeitherParameterIsGiven() throws Exception {
+        when(listMoviesQuery.list(1, "")).thenReturn(new MoviePage(List.of(), 1, 1, 0, ""));
 
         mockMvc.perform(get("/movies")).andExpect(status().isOk());
 
-        verify(listMoviesQuery).list(1);
+        verify(listMoviesQuery).list(1, "");
     }
 
     @Test
     void passesTheRequestedPageNumberThroughToTheQuery() throws Exception {
-        when(listMoviesQuery.list(3)).thenReturn(new MoviePage(List.of(), 3, 5, 250));
+        when(listMoviesQuery.list(3, "")).thenReturn(new MoviePage(List.of(), 3, 5, 250, ""));
 
         mockMvc.perform(get("/movies").param("page", "3")).andExpect(status().isOk());
 
-        verify(listMoviesQuery).list(3);
+        verify(listMoviesQuery).list(3, "");
+    }
+
+    @Test
+    void passesTheQueryParameterThroughToTheQuery() throws Exception {
+        when(listMoviesQuery.list(1, "batman")).thenReturn(new MoviePage(List.of(), 1, 1, 1, "batman"));
+
+        mockMvc.perform(get("/movies").param("q", "batman")).andExpect(status().isOk());
+
+        verify(listMoviesQuery).list(1, "batman");
+    }
+
+    @Test
+    void echoesTheActiveQueryBackIntoTheSearchInputsValue() throws Exception {
+        when(listMoviesQuery.list(1, "batman")).thenReturn(new MoviePage(List.of(), 1, 1, 1, "batman"));
+
+        String html = render("/movies?q=batman");
+
+        assertThat(html).contains("value=\"batman\"");
     }
 
     @Test
     void onTheFirstPageFirstAndPreviousAreDisabledWhileNextAndLastLink() throws Exception {
-        when(listMoviesQuery.list(1)).thenReturn(new MoviePage(List.of(), 1, 3, 120));
+        when(listMoviesQuery.list(1, "")).thenReturn(new MoviePage(List.of(), 1, 3, 120, ""));
 
         String html = render("/movies");
 
@@ -74,7 +93,7 @@ class MovieListingControllerTest {
 
     @Test
     void onTheLastPageNextAndLastAreDisabledWhileFirstAndPreviousLink() throws Exception {
-        when(listMoviesQuery.list(3)).thenReturn(new MoviePage(List.of(), 3, 3, 120));
+        when(listMoviesQuery.list(3, "")).thenReturn(new MoviePage(List.of(), 3, 3, 120, ""));
 
         String html = render("/movies?page=3");
 
@@ -86,8 +105,21 @@ class MovieListingControllerTest {
     }
 
     @Test
+    void pagingLinksCarryTheActiveSearchQuery() throws Exception {
+        when(listMoviesQuery.list(1, "die hard")).thenReturn(new MoviePage(List.of(), 1, 3, 120, "die hard"));
+
+        String html = mockMvc.perform(get("/movies").param("q", "die hard"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html).contains("href=\"/movies?page=2&amp;q=die+hard\"");
+    }
+
+    @Test
     void rendersEveryMovieColumnHeader() throws Exception {
-        when(listMoviesQuery.list(1)).thenReturn(new MoviePage(List.of(), 1, 1, 0));
+        when(listMoviesQuery.list(1, "")).thenReturn(new MoviePage(List.of(), 1, 1, 0, ""));
 
         String html = render("/movies");
 

@@ -24,8 +24,11 @@ public class MovieListingController {
     private final ListMoviesQuery listMoviesQuery;
 
     @GetMapping({"/", "/movies"})
-    public String listMovies(@RequestParam(name = "page", defaultValue = "1") int page, Model model) {
-        MoviePage moviePage = listMoviesQuery.list(page);
+    public String listMovies(
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "q", defaultValue = "") String query,
+            Model model) {
+        MoviePage moviePage = listMoviesQuery.list(page, query);
 
         List<Movie> movies = moviePage.movies();
         List<MovieRow> rows = IntStream.range(0, movies.size())
@@ -36,6 +39,7 @@ public class MovieListingController {
         model.addAttribute("pageNumber", moviePage.pageNumber());
         model.addAttribute("totalPages", moviePage.totalPages());
         model.addAttribute("totalElements", moviePage.totalElements());
+        model.addAttribute("query", moviePage.query());
         model.addAttribute("pagination", PaginationLinks.from(moviePage));
 
         return "movies";

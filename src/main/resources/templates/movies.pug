@@ -1,6 +1,10 @@
 extends layout
 
 block content
+  form.search(method="get", action="/movies")
+    input.search__input(type="search", name="q", value=query, placeholder="Search title, genre or year")
+    button.search__button(type="submit") Search
+
   table.catalogue
     thead
       tr

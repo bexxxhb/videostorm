@@ -27,6 +27,9 @@ class MovieEntity {
     @Column(name = "normalized_title")
     private String normalizedTitle;
 
+    @Column(name = "normalized_original_title")
+    private String normalizedOriginalTitle;
+
     private Integer year;
 
     @Column(name = "rating_source")

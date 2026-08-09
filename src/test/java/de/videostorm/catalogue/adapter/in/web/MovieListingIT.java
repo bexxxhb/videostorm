@@ -196,6 +196,107 @@ class MovieListingIT extends PostgresIntegrationTestBase {
         assertThat(html).doesNotContain("<td>Movie 101</td>");
     }
 
+    @Test
+    void searchMatchesWhenTheNormalizedTitleContainsTheTermIgnoringAccentsAndPunctuation() throws Exception {
+        insertMovie("96 Hours - Taken 3", 2014, null, null, List.of(), null);
+        insertMovie("Mädchen", 2000, null, null, List.of(), null);
+        insertMovie("Unrelated Movie", 2014, null, null, List.of(), null);
+
+        assertThat(render("/movies?q=hours+taken")).contains("<td>96 Hours - Taken 3</td>");
+        assertThat(render("/movies?q=madchen")).contains("<td>M&auml;dchen</td>");
+        assertThat(render("/movies?q=hours+taken")).doesNotContain("<td>Unrelated Movie</td>");
+    }
+
+    @Test
+    void searchMatchesWhenTheNormalizedOriginalTitleContainsTheTerm() throws Exception {
+        insertMovie("El Cuerpo", "The Body", 2012, null, null, List.of(), null);
+        insertMovie("Unrelated Movie", null, 2012, null, null, List.of(), null);
+
+        String html = render("/movies?q=body");
+
+        assertThat(html).contains("<td>El Cuerpo</td>");
+        assertThat(html).doesNotContain("<td>Unrelated Movie</td>");
+    }
+
+    @Test
+    void searchMatchesGenresCaseInsensitivelyBySubstring() throws Exception {
+        insertMovie("Heat", 1995, null, null, List.of("Crime", "Thriller"), null);
+        insertMovie("Other", 1995, null, null, List.of("Comedy"), null);
+
+        String html = render("/movies?q=THRIL");
+
+        assertThat(html).contains("<td>Heat</td>");
+        assertThat(html).doesNotContain("<td>Other</td>");
+    }
+
+    @Test
+    void aFourDigitTermMatchesTheYearExactly() throws Exception {
+        insertMovie("The Thing", 1982, null, null, List.of(), null);
+        insertMovie("The Thing", 2011, null, null, List.of(), null);
+
+        String html = render("/movies?q=1982");
+
+        assertThat(html).contains("<td>1982</td>");
+        assertThat(html).doesNotContain("<td>2011</td>");
+    }
+
+    @Test
+    void numericTermsOfOtherLengthsNeverMatchTheYearButCanStillMatchTheTitle() throws Exception {
+        insertMovie("Movie 82", 1982, null, null, List.of(), null);
+        insertMovie("Another Film", 1982, null, null, List.of(), null);
+
+        String html = render("/movies?q=82");
+
+        assertThat(html).contains("<td>Movie 82</td>");
+        assertThat(html).doesNotContain("<td>Another Film</td>");
+    }
+
+    @Test
+    void anEmptySearchBoxReturnsEveryEntry() throws Exception {
+        insertMovie("Alpha", 2000, null, null, List.of(), null);
+        insertMovie("Beta", 2000, null, null, List.of(), null);
+
+        String html = render("/movies?q=");
+
+        assertThat(html).contains("<td>Alpha</td>").contains("<td>Beta</td>");
+    }
+
+    @Test
+    void theGenreDelimiterIsStrippedFromUserInputSoATermCannotMatchAcrossTwoGenres() throws Exception {
+        insertMovie("Spanning Test", 2000, null, null, List.of("AB", "CD"), null); // stored as |AB|CD|
+
+        // Without stripping the delimiter, "B|C" would match the raw stored string "|AB|CD|",
+        // spanning the boundary between the AB and CD genres.
+        String html = mockMvc.perform(get("/movies").param("q", "B|C"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(html).doesNotContain("<td>Spanning Test</td>");
+    }
+
+    @Test
+    void theActiveSearchQueryIsEchoedBackIntoTheSearchInput() throws Exception {
+        String html = render("/movies?q=batman");
+
+        assertThat(html).contains("value=\"batman\"");
+    }
+
+    @Test
+    void pagingPreservesTheActiveSearchQuery() throws Exception {
+        for (int i = 1; i <= 60; i++) {
+            insertMovie(String.format("Batman Movie %03d", i), 2000, null, null, List.of(), null);
+        }
+        insertMovie("Unrelated", 2000, null, null, List.of(), null);
+
+        String html = render("/movies?q=batman");
+
+        assertThat(html).contains("Page 1 of 2");
+        assertThat(html).contains("60 total");
+        assertThat(html).contains("href=\"/movies?page=2&amp;q=batman\"");
+    }
+
     private void seedMovies(int count) {
         for (int i = 1; i <= count; i++) {
             insertMovie(String.format("Movie %03d", i), 2000, null, null, List.of(), null);
@@ -205,15 +306,24 @@ class MovieListingIT extends PostgresIntegrationTestBase {
     private void insertMovie(
             String title, Integer year, String ratingSource, BigDecimal ratingValue,
             List<String> genreValues, Integer runtimeMinutes) {
+        insertMovie(title, null, year, ratingSource, ratingValue, genreValues, runtimeMinutes);
+    }
+
+    private void insertMovie(
+            String title, String originalTitle, Integer year, String ratingSource, BigDecimal ratingValue,
+            List<String> genreValues, Integer runtimeMinutes) {
         String normalizedTitle = TitleNormalizer.normalize(title);
+        String normalizedOriginalTitle = originalTitle == null ? null : TitleNormalizer.normalize(originalTitle);
         String genres = new GenreList(genreValues).toStorage();
         String slug = normalizedTitle.replace(' ', '-') + "-" + (year == null ? 0 : year) + "-" + System.nanoTime();
 
         jdbcTemplate.update("""
-                INSERT INTO movie (title, year, normalized_title, rating_source, rating_value, genres, runtime_minutes, slug)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO movie (title, original_title, year, normalized_title, normalized_original_title,
+                                    rating_source, rating_value, genres, runtime_minutes, slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                title, year == null ? 0 : year, normalizedTitle, ratingSource, ratingValue, genres, runtimeMinutes, slug);
+                title, originalTitle, year == null ? 0 : year, normalizedTitle, normalizedOriginalTitle,
+                ratingSource, ratingValue, genres, runtimeMinutes, slug);
     }
 
     private String render(String path) throws Exception {
