@@ -9,6 +9,13 @@ html(lang="en")
     header.masthead
       a.masthead__brand(href="/") Videostorm
     nav.tabs
-      a.tab.tab--active(href="/movies") Movies
+      if activeTab === "movies"
+        a.tab.tab--active(href="/movies") Movies
+      else
+        a.tab(href="/movies") Movies
+      if activeTab === "shows"
+        a.tab.tab--active(href="/shows") Shows
+      else
+        a.tab(href="/shows") Shows
     main.content
       block content

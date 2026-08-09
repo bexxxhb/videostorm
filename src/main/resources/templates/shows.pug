@@ -1,0 +1,42 @@
+extends layout
+
+block content
+  form.search(method="get", action="/shows")
+    input.search__input(type="search", name="q", value=query, placeholder="Search title, genre or year")
+    button.search__button(type="submit") Search
+
+  table.catalogue
+    thead
+      tr
+        th Title
+        th Year
+        th Status
+        th Rating
+        th Genres
+    tbody
+      each show in shows
+        tr(class=show.rowClass)
+          td= show.title
+          td= show.year
+          td= show.statusDisplay
+          td= show.ratingDisplay
+          td(title=show.genresFullText)= show.genresDisplay
+
+  nav.pagination
+    if pagination.firstPageUrl
+      a.pagination__link(href=pagination.firstPageUrl) First
+    else
+      span.pagination__link.pagination__link--disabled First
+    if pagination.previousPageUrl
+      a.pagination__link(href=pagination.previousPageUrl) Previous
+    else
+      span.pagination__link.pagination__link--disabled Previous
+    span.pagination__status Page #{pageNumber} of #{totalPages} (#{totalElements} total)
+    if pagination.nextPageUrl
+      a.pagination__link(href=pagination.nextPageUrl) Next
+    else
+      span.pagination__link.pagination__link--disabled Next
+    if pagination.lastPageUrl
+      a.pagination__link(href=pagination.lastPageUrl) Last
+    else
+      span.pagination__link.pagination__link--disabled Last

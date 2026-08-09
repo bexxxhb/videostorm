@@ -40,7 +40,10 @@ public class MovieListingController {
         model.addAttribute("totalPages", moviePage.totalPages());
         model.addAttribute("totalElements", moviePage.totalElements());
         model.addAttribute("query", moviePage.query());
-        model.addAttribute("pagination", PaginationLinks.from(moviePage));
+        model.addAttribute("pagination", PaginationLinks.from(
+                moviePage.pageNumber(), moviePage.totalPages(),
+                moviePage.hasPrevious(), moviePage.hasNext(), moviePage.query(), "/movies"));
+        model.addAttribute("activeTab", "movies");
 
         return "movies";
     }
