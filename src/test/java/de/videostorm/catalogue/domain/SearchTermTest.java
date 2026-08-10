@@ -66,4 +66,10 @@ class SearchTermTest {
     void surroundingWhitespaceIsTrimmedBeforeMatchingTheYear() {
         assertThat(new SearchTerm(" 1984 ").yearExactMatch()).isEqualTo(Optional.of(1984));
     }
+
+    @Test
+    void theUnknownYearIsNeverMatched() {
+        // A zero year means "no year"; searching 0000 must never surface entries that lack one.
+        assertThat(new SearchTerm("0000").yearExactMatch()).isEmpty();
+    }
 }

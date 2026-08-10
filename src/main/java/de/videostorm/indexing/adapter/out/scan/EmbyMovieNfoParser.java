@@ -46,12 +46,19 @@ class EmbyMovieNfoParser {
     }
 
     private static Element documentRoot(String xml) {
+        Element root;
         try {
             DocumentBuilder builder = secureFactory().newDocumentBuilder();
-            return builder.parse(new InputSource(new StringReader(xml))).getDocumentElement();
+            root = builder.parse(new InputSource(new StringReader(xml))).getDocumentElement();
         } catch (Exception e) {
             throw new NfoParseException("Could not parse .nfo as XML", e);
         }
+        if (root == null || !"movie".equals(root.getNodeName())) {
+            // Well-formed XML with the wrong root is as useless as an absent file; the scan treats
+            // this exactly as one, deriving the title from the folder instead.
+            throw new NfoParseException("Root element of .nfo is not <movie>", null);
+        }
+        return root;
     }
 
     private static DocumentBuilderFactory secureFactory() throws Exception {

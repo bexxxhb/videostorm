@@ -26,4 +26,13 @@ public record ParsedMovie(
         ratings = ratings == null ? List.of() : List.copyOf(ratings);
         genres = genres == null ? List.of() : List.copyOf(genres);
     }
+
+    /**
+     * A film about which nothing is known: the state a folder with no metadata file, or one whose
+     * {@code .nfo} was too broken to read, falls back to. Everything is absent, so the derivations
+     * downstream supply a folder-derived title and a zero year.
+     */
+    public static ParsedMovie absent() {
+        return new ParsedMovie(null, null, null, null, null, null, null, null, null, null, null, null);
+    }
 }

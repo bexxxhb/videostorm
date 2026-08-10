@@ -2,9 +2,13 @@ package de.videostorm.indexing.adapter.out.scan;
 
 import de.videostorm.indexing.application.port.out.LibraryScan;
 import de.videostorm.indexing.application.port.out.MovieStaging;
+import de.videostorm.indexing.domain.DerivedTitle;
+import de.videostorm.indexing.domain.FeatureSelection;
 import de.videostorm.indexing.domain.ParsedMovie;
 import de.videostorm.indexing.domain.RecognizedVideo;
 import de.videostorm.indexing.domain.RunCounts;
+import de.videostorm.indexing.domain.RunIssue;
+import de.videostorm.indexing.domain.ScanReport;
 import de.videostorm.indexing.domain.StagedMovie;
 import de.videostorm.sources.domain.SourcePath;
 import de.videostorm.sources.domain.SourcePaths;
@@ -26,10 +30,16 @@ import java.util.stream.Stream;
 
 /**
  * The real movie scan: walks each configured movie source path exactly one level deep, treats every
- * immediate subdirectory as one movie, parses the first {@code .nfo} it finds, and writes the result
- * to staging — the only part of a run that touches the disks. The live catalogue is never touched
- * here; swapping staging into live is a separate step ({@code CataloguePromotion}), run once the
- * scan has finished successfully.
+ * immediate subdirectory as one movie, and writes what it can to staging — the only part of a run that
+ * touches the disks. The live catalogue is never touched here; swapping staging into live is a
+ * separate step ({@code CataloguePromotion}), run once the scan has finished successfully.
+ *
+ * <p>Nothing is rejected for being thin. A folder with no {@code .nfo}, or one whose {@code .nfo} is
+ * too broken to read, is catalogued from a folder-derived title with a zero year. Where several videos
+ * sit together the feature is chosen by {@link FeatureSelection} and the rest recorded as ignored. A
+ * folder with a metadata file but no video produces no entry and is recorded as a problem. Every gap
+ * and every dropped file becomes a {@link RunIssue} on the returned {@link ScanReport}, so the run can
+ * report what was thin without anything disappearing silently.
  *
  * <p>Folder and file order is the deterministic codepoint sort, so "the first {@code .nfo}" is a
  * stable choice regardless of the filesystem's own ordering. Shows are not scanned yet: a run for
@@ -51,14 +61,15 @@ class FilesystemMovieScan implements LibraryScan {
     }
 
     @Override
-    public RunCounts scan(SourceType type) {
+    public ScanReport scan(SourceType type) {
         if (type != SourceType.MOVIES) {
-            return RunCounts.none();
+            return ScanReport.none();
         }
         staging.clear();
 
         int found = 0;
         int indexed = 0;
+        List<RunIssue> issues = new ArrayList<>();
         for (SourcePath sourcePath : sourcePaths.pathsFor(SourceType.MOVIES)) {
             Path root = Path.of(sourcePath.value());
             if (!Files.isDirectory(root)) {
@@ -67,33 +78,94 @@ class FilesystemMovieScan implements LibraryScan {
             }
             for (Path folder : sortedChildDirectories(root)) {
                 found++;
-                if (stageMovie(folder)) {
+                if (stageMovie(folder, issues)) {
                     indexed++;
                 }
             }
         }
-        log.info("Movie scan found {} folders, parsed {} into staging", found, indexed);
-        return new RunCounts(found, indexed);
+        log.info("Movie scan found {} folders, staged {}, recorded {} issues", found, indexed, issues.size());
+        return new ScanReport(new RunCounts(found, indexed), issues);
     }
 
-    private boolean stageMovie(Path folder) {
+    /** Stages the folder as a movie where it holds a video, appending any issues it turned up. */
+    private boolean stageMovie(Path folder, List<RunIssue> issues) {
         List<Path> files = sortedRegularFiles(folder);
-        boolean hasVideo = files.stream()
-                .anyMatch(file -> RecognizedVideo.isVideoFile(file.getFileName().toString()));
-        if (!hasVideo) {
-            return false;
-        }
+        List<Path> videos = files.stream()
+                .filter(file -> RecognizedVideo.isVideoFile(file.getFileName().toString()))
+                .toList();
         Path nfo = files.stream()
                 .filter(file -> file.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(NFO_EXTENSION))
                 .findFirst()
                 .orElse(null);
-        if (nfo == null) {
+
+        String raw = nfo == null ? null : read(nfo);
+        ParsedMovie parsed = parseOrAbsent(raw);
+        String folderName = folder.getFileName().toString();
+
+        if (videos.isEmpty()) {
+            if (nfo != null) {
+                // Metadata but nothing to catalogue: no entry, recorded so the folder is not lost.
+                issues.add(RunIssue.noVideo(pathOf(folder), DerivedTitle.resolve(parsed.title(), folderName)));
+            }
             return false;
         }
-        String raw = read(nfo);
-        ParsedMovie parsed = parser.parse(raw);
-        staging.stage(StagedMovie.from(parsed, folder.toAbsolutePath().toString(), raw));
+
+        recordIgnoredVideos(folder, folderName, parsed, videos, issues);
+
+        StagedMovie movie = StagedMovie.from(parsed, folderName, pathOf(folder), raw);
+        staging.stage(movie);
+        recordThinFields(folder, movie, issues);
         return true;
+    }
+
+    private void recordIgnoredVideos(Path folder, String folderName, ParsedMovie parsed,
+                                     List<Path> videos, List<RunIssue> issues) {
+        if (videos.size() == 1) {
+            return;
+        }
+        List<FeatureSelection.Video> candidates = videos.stream()
+                .map(video -> new FeatureSelection.Video(video.getFileName().toString(), sizeOf(video)))
+                .toList();
+        FeatureSelection selection = FeatureSelection.choose(folderName, candidates);
+        String title = DerivedTitle.resolve(parsed.title(), folderName);
+        for (FeatureSelection.Video ignored : selection.ignored()) {
+            issues.add(RunIssue.ignoredVideo(pathOf(folder.resolve(ignored.filename())), title));
+        }
+    }
+
+    private void recordThinFields(Path folder, StagedMovie movie, List<RunIssue> issues) {
+        String path = pathOf(folder);
+        if (movie.derivedTitle()) {
+            issues.add(RunIssue.missingField(path, movie.title(), RunIssue.TITLE_FIELD));
+        }
+        if (movie.year() == 0) {
+            issues.add(RunIssue.missingField(path, movie.title(), RunIssue.YEAR_FIELD));
+        }
+    }
+
+    private ParsedMovie parseOrAbsent(String raw) {
+        if (raw == null) {
+            return ParsedMovie.absent();
+        }
+        try {
+            return parser.parse(raw);
+        } catch (EmbyMovieNfoParser.NfoParseException e) {
+            // A truncated, non-XML or wrong-rooted file is treated exactly as an absent one.
+            log.warn("Unreadable .nfo treated as absent: {}", e.getMessage());
+            return ParsedMovie.absent();
+        }
+    }
+
+    private static String pathOf(Path path) {
+        return path.toAbsolutePath().toString();
+    }
+
+    private static long sizeOf(Path file) {
+        try {
+            return Files.size(file);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not size video file " + file, e);
+        }
     }
 
     private static List<Path> sortedChildDirectories(Path root) {

@@ -9,8 +9,9 @@ import de.videostorm.indexing.application.port.out.CataloguePromotion;
 import de.videostorm.indexing.application.port.out.IndexingRunRepository;
 import de.videostorm.indexing.application.port.out.LibraryScan;
 import de.videostorm.indexing.application.port.out.MountPreflight;
+import de.videostorm.indexing.application.port.out.RunIssueRepository;
 import de.videostorm.indexing.domain.IndexingRun;
-import de.videostorm.indexing.domain.RunCounts;
+import de.videostorm.indexing.domain.ScanReport;
 import de.videostorm.sources.domain.SourcePath;
 import de.videostorm.sources.domain.SourceType;
 import org.slf4j.Logger;
@@ -50,17 +51,19 @@ public class IndexingService implements TriggerReindex, IndexingStatus, Reconcil
     private final LibraryScan libraryScan;
     private final CataloguePromotion promotion;
     private final MountPreflight mountPreflight;
+    private final RunIssueRepository runIssues;
     private final Executor executor;
     private final Clock clock;
     private final Object triggerLock = new Object();
 
     public IndexingService(IndexingRunRepository repository, LibraryScan libraryScan,
                            CataloguePromotion promotion, MountPreflight mountPreflight,
-                           Executor indexingExecutor, Clock clock) {
+                           RunIssueRepository runIssues, Executor indexingExecutor, Clock clock) {
         this.repository = repository;
         this.libraryScan = libraryScan;
         this.promotion = promotion;
         this.mountPreflight = mountPreflight;
+        this.runIssues = runIssues;
         this.executor = indexingExecutor;
         this.clock = clock;
     }
@@ -86,9 +89,10 @@ public class IndexingService implements TriggerReindex, IndexingStatus, Reconcil
 
     private void runScan(IndexingRun run) {
         try {
-            RunCounts counts = libraryScan.scan(run.type());
+            ScanReport report = libraryScan.scan(run.type());
             promotion.promote(run.type());
-            repository.save(run.complete(counts, clock.instant()));
+            runIssues.record(run.id(), report.issues());
+            repository.save(run.complete(report.counts(), clock.instant()));
         } catch (RuntimeException e) {
             log.error("Indexing run {} for {} failed", run.id(), run.type(), e);
             repository.save(run.fail(clock.instant()));

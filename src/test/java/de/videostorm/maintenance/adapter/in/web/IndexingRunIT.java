@@ -3,7 +3,7 @@ package de.videostorm.maintenance.adapter.in.web;
 import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.indexing.application.port.out.LibraryScan;
 import de.videostorm.indexing.application.port.out.MountPreflight;
-import de.videostorm.indexing.domain.RunCounts;
+import de.videostorm.indexing.domain.ScanReport;
 import de.videostorm.sources.domain.SourceType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -168,14 +168,14 @@ class IndexingRunIT extends PostgresIntegrationTestBase {
         }
 
         @Override
-        public RunCounts scan(SourceType type) {
+        public ScanReport scan(SourceType type) {
             entered.countDown();
             try {
                 release.await(5, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            return RunCounts.none();
+            return ScanReport.none();
         }
     }
 }
