@@ -5,6 +5,7 @@ import de.videostorm.indexing.application.port.in.IndexingStatus;
 import de.videostorm.indexing.application.port.in.ReconcileRuns;
 import de.videostorm.indexing.application.port.in.TriggerReindex;
 import de.videostorm.indexing.application.port.in.TriggerResult;
+import de.videostorm.indexing.application.port.out.CataloguePromotion;
 import de.videostorm.indexing.application.port.out.IndexingRunRepository;
 import de.videostorm.indexing.application.port.out.LibraryScan;
 import de.videostorm.indexing.domain.IndexingRun;
@@ -25,6 +26,10 @@ import java.util.concurrent.Executor;
  * is already active rather than submitting a second task to queue behind the first. The database's
  * partial unique index is the backstop should that guard ever be bypassed. Whatever the scan does —
  * complete or throw — the run is always settled, so it can never be stranded {@code RUNNING}.
+ *
+ * <p>A successful scan is followed by a {@link CataloguePromotion}, swapping the freshly staged
+ * catalogue into live in one step. A scan or promotion that throws settles the run {@code FAILED}
+ * and leaves the live catalogue exactly as it was.
  */
 @Service
 public class IndexingService implements TriggerReindex, IndexingStatus, ReconcileRuns {
@@ -35,14 +40,16 @@ public class IndexingService implements TriggerReindex, IndexingStatus, Reconcil
 
     private final IndexingRunRepository repository;
     private final LibraryScan libraryScan;
+    private final CataloguePromotion promotion;
     private final Executor executor;
     private final Clock clock;
     private final Object triggerLock = new Object();
 
     public IndexingService(IndexingRunRepository repository, LibraryScan libraryScan,
-                           Executor indexingExecutor, Clock clock) {
+                           CataloguePromotion promotion, Executor indexingExecutor, Clock clock) {
         this.repository = repository;
         this.libraryScan = libraryScan;
+        this.promotion = promotion;
         this.executor = indexingExecutor;
         this.clock = clock;
     }
@@ -63,6 +70,7 @@ public class IndexingService implements TriggerReindex, IndexingStatus, Reconcil
     private void runScan(IndexingRun run) {
         try {
             RunCounts counts = libraryScan.scan(run.type());
+            promotion.promote(run.type());
             repository.save(run.complete(counts, clock.instant()));
         } catch (RuntimeException e) {
             log.error("Indexing run {} for {} failed", run.id(), run.type(), e);

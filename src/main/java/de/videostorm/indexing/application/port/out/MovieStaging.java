@@ -5,7 +5,7 @@ import de.videostorm.indexing.domain.StagedMovie;
 /**
  * Writes parsed movies into the staging tables, which mirror the live catalogue but are never read
  * by the listing. The live catalogue is left untouched here; promoting staging into live is a
- * separate step (issue #11).
+ * separate step ({@link CataloguePromotion}).
  */
 public interface MovieStaging {
 

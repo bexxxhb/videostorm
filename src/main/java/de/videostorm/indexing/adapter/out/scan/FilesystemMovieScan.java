@@ -28,7 +28,8 @@ import java.util.stream.Stream;
  * The real movie scan: walks each configured movie source path exactly one level deep, treats every
  * immediate subdirectory as one movie, parses the first {@code .nfo} it finds, and writes the result
  * to staging — the only part of a run that touches the disks. The live catalogue is never touched
- * here; the swap into live is a later ticket (#11).
+ * here; swapping staging into live is a separate step ({@code CataloguePromotion}), run once the
+ * scan has finished successfully.
  *
  * <p>Folder and file order is the deterministic codepoint sort, so "the first {@code .nfo}" is a
  * stable choice regardless of the filesystem's own ordering. Shows are not scanned yet: a run for

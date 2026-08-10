@@ -1,6 +1,7 @@
 package de.videostorm.indexing.application;
 
 import de.videostorm.indexing.application.port.in.TriggerResult;
+import de.videostorm.indexing.application.port.out.CataloguePromotion;
 import de.videostorm.indexing.application.port.out.IndexingRunRepository;
 import de.videostorm.indexing.application.port.out.LibraryScan;
 import de.videostorm.indexing.domain.IndexingRun;
@@ -32,6 +33,7 @@ class IndexingServiceTest {
     private InMemoryRunRepository repository;
     private ManualExecutor executor;
     private StubScan scan;
+    private StubPromotion promotion;
     private IndexingService service;
 
     @BeforeEach
@@ -39,7 +41,8 @@ class IndexingServiceTest {
         repository = new InMemoryRunRepository();
         executor = new ManualExecutor();
         scan = new StubScan();
-        service = new IndexingService(repository, scan, executor, Clock.fixed(NOW, ZoneOffset.UTC));
+        promotion = new StubPromotion();
+        service = new IndexingService(repository, scan, promotion, executor, Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
@@ -81,8 +84,38 @@ class IndexingServiceTest {
     }
 
     @Test
+    void aSuccessfulScanPromotesTheStagedCatalogueForItsType() {
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        assertThat(promotion.promotedTypes).containsExactly(SourceType.MOVIES);
+    }
+
+    @Test
     void aScanThatThrowsSettlesTheRunAsFailedRatherThanLeavingItActive() {
         scan.failure = new IllegalStateException("boom");
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        assertThat(repository.findActiveRun()).isEmpty();
+        assertThat(repository.all.get(0).status()).isEqualTo(RunStatus.FAILED);
+    }
+
+    @Test
+    void aScanThatThrowsIsNeverPromoted() {
+        scan.failure = new IllegalStateException("boom");
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        assertThat(promotion.promotedTypes).isEmpty();
+    }
+
+    @Test
+    void aPromotionThatThrowsSettlesTheRunAsFailed() {
+        promotion.failure = new IllegalStateException("swap failed");
         service.trigger(SourceType.MOVIES);
 
         executor.runAll();
@@ -153,6 +186,19 @@ class IndexingServiceTest {
                 throw failure;
             }
             return counts;
+        }
+    }
+
+    private static final class StubPromotion implements CataloguePromotion {
+        private final List<SourceType> promotedTypes = new ArrayList<>();
+        private RuntimeException failure;
+
+        @Override
+        public void promote(SourceType type) {
+            if (failure != null) {
+                throw failure;
+            }
+            promotedTypes.add(type);
         }
     }
 
