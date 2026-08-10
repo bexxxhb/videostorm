@@ -18,6 +18,22 @@ Overridable via the environment (or a `.env` file): `POSTGRES_DB`, `POSTGRES_USE
 `admin` / `changeme`) — the login for the `/maintenance` area, BCrypted once at startup and never
 logged. Change the admin credentials for anything beyond local use.
 
+### Source paths and mounts
+
+The library lives behind read-only bind mounts. Point the host paths at your library and, if the
+container process needs a specific identity to read them, set the uid and gid:
+
+- `VIDEOSTORM_MOVIES_HOST` / `VIDEOSTORM_SHOWS_HOST` — host directories to mount (default
+  `./media/movies`, `./media/shows`), mounted read-only at `/media/movies` and `/media/shows`.
+- `VIDEOSTORM_SOURCES_MOVIES` / `VIDEOSTORM_SOURCES_SHOWS` — comma-separated absolute paths the
+  application indexes, **inside** the container; they must match the mounts (default
+  `/media/movies`, `/media/shows`). Entries are trimmed and normalised; startup fails, naming the
+  offending pair, if any two overlap or a path is not absolute. A type with no configured paths
+  does not block startup — its re-index trigger is simply shown disabled. Configured paths are
+  logged with their reachability at startup and never rendered in the UI.
+- `PUID` / `PGID` — uid and gid the container runs as (default `1000`), so it can read files owned
+  by your host account.
+
 ## Developing
 
 Java 21 is required — `sdk env install` picks it up from [`.sdkmanrc`](.sdkmanrc).
@@ -43,15 +59,24 @@ The code follows a hexagonal (ports and adapters) arrangement with a DDD domain 
 ```
 de.videostorm
 ├── config                              Spring wiring that belongs to no single slice
-└── catalogue
-    ├── domain                          Movie, Show and value objects; no framework dependencies
-    ├── application                     Use-case services (ListMoviesService, ListShowsService, ...)
-    │   └── port
-    │       ├── in                      Query interfaces the adapters call into the application
-    │       └── out                     Repository interfaces the application calls out through
-    └── adapter
-        ├── in.web                      HTTP entry points (controllers), rendered with Pug4j
-        └── out.persistence             JPA entities and repository adapters
+├── sources                             Configured source paths: domain value objects + config binding
+├── catalogue
+│   ├── domain                          Movie, Show and value objects; no framework dependencies
+│   ├── application                     Use-case services (ListMoviesService, ListShowsService, ...)
+│   │   └── port
+│   │       ├── in                      Query interfaces the adapters call into the application
+│   │       └── out                     Repository interfaces the application calls out through
+│   └── adapter
+│       ├── in.web                      HTTP entry points (controllers), rendered with Pug4j
+│       └── out.persistence             JPA entities and repository adapters
+├── indexing                            Indexing run lifecycle: trigger, background run, history
+│   ├── domain                          IndexingRun aggregate, RunStatus, RunCounts
+│   ├── application                     IndexingService + ports (trigger, status, reconcile, scan)
+│   └── adapter
+│       ├── in.lifecycle                Marks runs left active by a restart as interrupted at startup
+│       └── out                         JPA persistence + the stub library scan
+└── maintenance
+    └── adapter.in.web                  The gated maintenance page: triggers, live status, history
 ```
 
 Templates live under `src/main/resources/templates` (`layout.pug`, `movies.pug`, `shows.pug`),

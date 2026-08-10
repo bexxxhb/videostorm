@@ -4,12 +4,16 @@ import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.config.PugViewConfiguration;
 import de.videostorm.config.security.AdminUserDetailsService;
 import de.videostorm.config.security.SecurityConfig;
+import de.videostorm.indexing.application.port.in.IndexingStatus;
+import de.videostorm.indexing.application.port.in.TriggerReindex;
+import de.videostorm.sources.config.SourcesConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,7 +32,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * dependency, so the full {@link SecurityConfig} filter chain is exercised here directly.
  */
 @WebMvcTest(controllers = {MaintenanceController.class, LoginController.class})
-@Import({SecurityConfig.class, AdminUserDetailsService.class, PugViewConfiguration.class})
+@Import({SecurityConfig.class, AdminUserDetailsService.class, PugViewConfiguration.class,
+        SourcesConfiguration.class})
 @TestPropertySource(properties = {
         "videostorm.admin.username=" + PostgresIntegrationTestBase.ADMIN_USERNAME,
         "videostorm.admin.password=" + PostgresIntegrationTestBase.ADMIN_PASSWORD
@@ -37,6 +42,12 @@ class MaintenanceSecurityTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private TriggerReindex triggerReindex;
+
+    @MockitoBean
+    private IndexingStatus indexingStatus;
 
     @Test
     void unauthenticatedRequestsToMaintenanceRedirectToLogin() throws Exception {

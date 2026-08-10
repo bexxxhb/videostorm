@@ -6,14 +6,47 @@ block content
     input(type="hidden", name=csrfParameterName, value=csrfToken)
     button.button(type="submit") Log out
 
+  if activeRun
+    section.run-status
+      h2 Run in progress
+      p.run-status__line #{activeRun.type} — #{activeRun.status}, started #{activeRun.startedAt}
+
   section.trigger
     h2 Movies
     form.form(method="post", action="/maintenance/movies/reindex")
       input(type="hidden", name=csrfParameterName, value=csrfToken)
-      button.button(type="submit", disabled) Re-index movies
+      button.button(type="submit", disabled=(!moviesConfigured || runActive)) Re-index movies
+    if !moviesConfigured
+      p.trigger__note No movie source paths are configured; nothing to re-index.
 
   section.trigger
     h2 Shows
     form.form(method="post", action="/maintenance/shows/reindex")
       input(type="hidden", name=csrfParameterName, value=csrfToken)
-      button.button(type="submit", disabled) Re-index shows
+      button.button(type="submit", disabled=(!showsConfigured || runActive)) Re-index shows
+    if !showsConfigured
+      p.trigger__note No show source paths are configured; nothing to re-index.
+
+  section.history
+    h2 Recent runs
+    if hasRuns
+      table.history__table
+        thead
+          tr
+            th Type
+            th Status
+            th Started
+            th Finished
+            th Found
+            th Indexed
+        tbody
+          each run in recentRuns
+            tr
+              td= run.type
+              td= run.status
+              td= run.startedAt
+              td= run.finishedAt
+              td= run.found
+              td= run.indexed
+    else
+      p.history__empty No runs yet.

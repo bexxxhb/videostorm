@@ -107,6 +107,29 @@ class MaintenanceIT extends PostgresIntegrationTestBase {
         assertThat(html).containsPattern("name=\"_csrf\"\\s+value=\"[^\"]+\"");
     }
 
+    @Test
+    void explainsThatTriggersAreUnconfiguredWhenNoSourcePathsAreSet() throws Exception {
+        MockHttpSession session = login();
+
+        String html = mockMvc.perform(get("/maintenance").session(session))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(html).contains("No movie source paths are configured");
+        assertThat(html).contains("No show source paths are configured");
+    }
+
+    private MockHttpSession login() throws Exception {
+        MockHttpSession session = (MockHttpSession) mockMvc.perform(get("/maintenance"))
+                .andReturn().getRequest().getSession();
+        mockMvc.perform(post("/login")
+                .session(session)
+                .param("username", ADMIN_USERNAME)
+                .param("password", ADMIN_PASSWORD)
+                .with(csrf()));
+        return session;
+    }
+
     private String render(String path) throws Exception {
         return mockMvc.perform(get(path))
                 .andExpect(status().isOk())
