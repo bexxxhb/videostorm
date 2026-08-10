@@ -5,9 +5,12 @@ import de.videostorm.indexing.application.port.out.CataloguePromotion;
 import de.videostorm.indexing.application.port.out.IndexingRunRepository;
 import de.videostorm.indexing.application.port.out.LibraryScan;
 import de.videostorm.indexing.application.port.out.MountPreflight;
+import de.videostorm.indexing.application.port.out.RunIssueRepository;
 import de.videostorm.indexing.domain.IndexingRun;
 import de.videostorm.indexing.domain.RunCounts;
+import de.videostorm.indexing.domain.RunIssue;
 import de.videostorm.indexing.domain.RunStatus;
+import de.videostorm.indexing.domain.ScanReport;
 import de.videostorm.sources.domain.SourcePath;
 import de.videostorm.sources.domain.SourceType;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +40,7 @@ class IndexingServiceTest {
     private StubScan scan;
     private StubPromotion promotion;
     private StubMountPreflight mountPreflight;
+    private RecordingRunIssues runIssues;
     private IndexingService service;
 
     @BeforeEach
@@ -46,7 +50,8 @@ class IndexingServiceTest {
         scan = new StubScan();
         promotion = new StubPromotion();
         mountPreflight = new StubMountPreflight();
-        service = new IndexingService(repository, scan, promotion, mountPreflight, executor,
+        runIssues = new RecordingRunIssues();
+        service = new IndexingService(repository, scan, promotion, mountPreflight, runIssues, executor,
                 Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
@@ -76,7 +81,7 @@ class IndexingServiceTest {
 
     @Test
     void theBackgroundScanCompletesTheRunWithItsCounts() {
-        scan.counts = new RunCounts(7, 5);
+        scan.report = new ScanReport(new RunCounts(7, 5), List.of());
         service.trigger(SourceType.MOVIES);
 
         executor.runAll();
@@ -86,6 +91,29 @@ class IndexingServiceTest {
         assertThat(settled.status()).isEqualTo(RunStatus.COMPLETED);
         assertThat(settled.counts()).isEqualTo(new RunCounts(7, 5));
         assertThat(settled.finishedAt()).isEqualTo(NOW);
+    }
+
+    @Test
+    void aSuccessfulRunRecordsItsIssuesAgainstTheRun() {
+        RunIssue gap = RunIssue.missingField("/media/movies/Blob", "The Blob", RunIssue.TITLE_FIELD);
+        scan.report = new ScanReport(new RunCounts(1, 1), List.of(gap));
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        Long runId = repository.all.get(0).id();
+        assertThat(runIssues.recordedRunIds).containsExactly(runId);
+        assertThat(runIssues.lastRecorded).containsExactly(gap);
+    }
+
+    @Test
+    void aFailedScanRecordsNoIssues() {
+        scan.failure = new IllegalStateException("boom");
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        assertThat(runIssues.recordedRunIds).isEmpty();
     }
 
     @Test
@@ -216,16 +244,28 @@ class IndexingServiceTest {
 
     private static final class StubScan implements LibraryScan {
         private int calls;
-        private RunCounts counts = RunCounts.none();
+        private ScanReport report = ScanReport.none();
         private RuntimeException failure;
 
         @Override
-        public RunCounts scan(SourceType type) {
+        public ScanReport scan(SourceType type) {
             calls++;
             if (failure != null) {
                 throw failure;
             }
-            return counts;
+            return report;
+        }
+    }
+
+    /** Captures the issues each completed run recorded, keyed by run id. */
+    private static final class RecordingRunIssues implements RunIssueRepository {
+        private final List<Long> recordedRunIds = new ArrayList<>();
+        private List<RunIssue> lastRecorded = List.of();
+
+        @Override
+        public void record(long runId, List<RunIssue> issues) {
+            recordedRunIds.add(runId);
+            lastRecorded = List.copyOf(issues);
         }
     }
 

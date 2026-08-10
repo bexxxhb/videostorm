@@ -14,6 +14,11 @@ public final class RecognizedVideo {
     private RecognizedVideo() {
     }
 
+    /** The recognised feature-video extensions, so other rules never re-list them and drift. */
+    public static Set<String> extensions() {
+        return EXTENSIONS;
+    }
+
     public static boolean isVideoFile(String filename) {
         int dot = filename.lastIndexOf('.');
         if (dot < 0) {

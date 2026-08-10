@@ -3,6 +3,8 @@ package de.videostorm.indexing.adapter.out.scan;
 import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.indexing.application.port.out.LibraryScan;
 import de.videostorm.indexing.domain.RunCounts;
+import de.videostorm.indexing.domain.RunIssueType;
+import de.videostorm.indexing.domain.ScanReport;
 import de.videostorm.sources.domain.SourceType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,7 +75,7 @@ class MovieScanIT extends PostgresIntegrationTestBase {
                 <movie><title>The Thing</title><year>1982</year></movie>
                 """, "thing.mp4");
 
-        RunCounts counts = scan.scan(SourceType.MOVIES);
+        RunCounts counts = scan.scan(SourceType.MOVIES).counts();
 
         assertThat(counts).isEqualTo(new RunCounts(2, 2));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isEqualTo(2);
@@ -113,7 +115,7 @@ class MovieScanIT extends PostgresIntegrationTestBase {
         movieFolder("Real Movie", "<movie><title>Real</title></movie>", "real.avi");
         movieFolder("Just Metadata", "<movie><title>Stranded</title></movie>", "notes.txt");
 
-        RunCounts counts = scan.scan(SourceType.MOVIES);
+        RunCounts counts = scan.scan(SourceType.MOVIES).counts();
 
         assertThat(counts).isEqualTo(new RunCounts(2, 1));
         assertThat(jdbc.queryForObject("SELECT title FROM movie_staging", String.class)).isEqualTo("Real");
@@ -123,19 +125,98 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     void doesNotScanShowsYet() {
         movieFolder("A Movie", "<movie><title>A</title></movie>", "a.mkv");
 
-        RunCounts counts = scan.scan(SourceType.SHOWS);
+        ScanReport report = scan.scan(SourceType.SHOWS);
 
-        assertThat(counts).isEqualTo(RunCounts.none());
+        assertThat(report.counts()).isEqualTo(RunCounts.none());
+        assertThat(report.issues()).isEmpty();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isZero();
     }
 
-    private Path movieFolder(String name, String nfo, String videoFile) {
+    @Test
+    void cataloguesAFolderWithNoMetadataFromADerivedTitleFlaggedAsSuch() {
+        Path folder = createFolder("The Blob (1958)");
+        write(folder.resolve("blob.mkv"), "video-bytes");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        assertThat(report.counts()).isEqualTo(new RunCounts(1, 1));
+        Map<String, Object> movie = jdbc.queryForMap("SELECT * FROM movie_staging");
+        assertThat(movie.get("title")).isEqualTo("The Blob (1958)");
+        assertThat(movie.get("derived_title")).isEqualTo(true);
+        // The year is never read from the (1958) in the folder name.
+        assertThat(movie.get("year")).isEqualTo(0);
+        assertThat(report.issues())
+                .anySatisfy(issue -> {
+                    assertThat(issue.type()).isEqualTo(RunIssueType.MISSING_FIELD);
+                    assertThat(issue.field()).isEqualTo("title");
+                    assertThat(issue.path()).isEqualTo(folder.toString());
+                })
+                .anySatisfy(issue -> assertThat(issue.field()).isEqualTo("year"));
+    }
+
+    @Test
+    void treatsAStructurallyBrokenNfoExactlyAsAnAbsentOne() {
+        Path folder = createFolder("Half Written");
+        write(folder.resolve("movie.nfo"), "<movie><title>Truncated");
+        write(folder.resolve("film.mp4"), "video-bytes");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        assertThat(report.counts()).isEqualTo(new RunCounts(1, 1));
+        Map<String, Object> movie = jdbc.queryForMap("SELECT * FROM movie_staging");
+        assertThat(movie.get("title")).isEqualTo("Half Written");
+        assertThat(movie.get("derived_title")).isEqualTo(true);
+    }
+
+    @Test
+    void choosesTheFeatureBySharedPrefixAndRecordsTheOthersAsIgnored() {
+        Path folder = movieFolder("Mad Max Fury Road", "<movie><title>Mad Max</title></movie>",
+                "Mad Max Fury Road.mkv");
+        write(folder.resolve("trailer.mp4"), "small");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        assertThat(report.counts()).isEqualTo(new RunCounts(1, 1));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isEqualTo(1);
+        assertThat(report.issues())
+                .filteredOn(issue -> issue.type() == RunIssueType.IGNORED_VIDEO)
+                .singleElement()
+                .satisfies(issue -> {
+                    assertThat(issue.path()).isEqualTo(folder.resolve("trailer.mp4").toString());
+                    assertThat(issue.title()).isEqualTo("Mad Max");
+                });
+    }
+
+    @Test
+    void recordsAFolderWithMetadataButNoVideoAsAProblemWithoutCataloguingIt() {
+        Path folder = createFolder("Just Metadata");
+        write(folder.resolve("movie.nfo"), "<movie><title>Stranded</title></movie>");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        assertThat(report.counts()).isEqualTo(new RunCounts(1, 0));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isZero();
+        assertThat(report.issues())
+                .filteredOn(issue -> issue.type() == RunIssueType.NO_VIDEO)
+                .singleElement()
+                .satisfies(issue -> {
+                    assertThat(issue.path()).isEqualTo(folder.toString());
+                    assertThat(issue.title()).isEqualTo("Stranded");
+                });
+    }
+
+    private Path createFolder(String name) {
         Path folder = MOVIES_DIR.resolve(name);
         try {
             Files.createDirectories(folder);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+        return folder;
+    }
+
+    private Path movieFolder(String name, String nfo, String videoFile) {
+        Path folder = createFolder(name);
         write(folder.resolve("movie.nfo"), nfo);
         write(folder.resolve(videoFile), "video-bytes");
         return folder;

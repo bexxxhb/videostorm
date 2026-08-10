@@ -43,7 +43,7 @@ class MovieStagingIT extends PostgresIntegrationTestBase {
         ParsedMovie parsed = new ParsedMovie("96 Hours - Taken 3", "Taken 3", 2014,
                 List.of(tmdb, imdb), List.of("Action", "Thriller"), 109, "A plot.",
                 "Taken Collection", "133352", "tt2446042", null, "260346");
-        return StagedMovie.from(parsed, "/media/movies/Taken 3 (2014)", "<movie>raw</movie>");
+        return StagedMovie.from(parsed, "Taken 3 (2014)", "/media/movies/Taken 3 (2014)", "<movie>raw</movie>");
     }
 
     @Test

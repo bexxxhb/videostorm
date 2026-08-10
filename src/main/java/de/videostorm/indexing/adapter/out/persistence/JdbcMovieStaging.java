@@ -29,7 +29,7 @@ class JdbcMovieStaging implements MovieStaging {
                 :ratingSource, :ratingValue, :ratingMax, :ratingVotes,
                 :genres, :runtimeMinutes, :plot, :setName, :collectionId,
                 :imdbId, :tvdbId, :tmdbId, :rawNfo, :slug, :sourcePath,
-                FALSE, FALSE)
+                :derivedTitle, FALSE)
             RETURNING id
             """;
 
@@ -58,6 +58,7 @@ class JdbcMovieStaging implements MovieStaging {
         ParsedRating inline = movie.defaultRating();
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("title", movie.title())
+                .addValue("derivedTitle", movie.derivedTitle())
                 .addValue("originalTitle", movie.originalTitle())
                 .addValue("year", movie.year())
                 .addValue("normalizedTitle", movie.normalizedTitle())

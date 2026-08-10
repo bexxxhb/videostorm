@@ -31,8 +31,15 @@ public record SearchTerm(String raw) {
         return raw.replace(GENRE_DELIMITER, "");
     }
 
-    /** The exact year to match, present only when the whole term is four digits. */
+    /**
+     * The exact year to match, present only when the whole term is four digits and not the unknown
+     * year — {@code 0000} never matches, so an entry with no year can never be found by searching.
+     */
     public Optional<Integer> yearExactMatch() {
-        return FOUR_DIGITS.matcher(raw).matches() ? Optional.of(Integer.valueOf(raw)) : Optional.empty();
+        if (!FOUR_DIGITS.matcher(raw).matches()) {
+            return Optional.empty();
+        }
+        int year = Integer.parseInt(raw);
+        return year == 0 ? Optional.empty() : Optional.of(year);
     }
 }

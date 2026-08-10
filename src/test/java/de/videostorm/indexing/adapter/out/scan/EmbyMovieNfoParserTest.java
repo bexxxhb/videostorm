@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Parsing an Emby movie {@code .nfo} into {@link ParsedMovie}: every field the catalogue keeps is
@@ -107,6 +108,20 @@ class EmbyMovieNfoParserTest {
         assertThat(movie.year()).isNull();
         assertThat(movie.runtimeMinutes()).isNull();
         assertThat(movie.genres()).containsExactly("Horror");
+    }
+
+    @Test
+    void rejectsAStructurallyBrokenFileSoTheScanCanTreatItAsAbsent() {
+        assertThatThrownBy(() -> parser.parse("<movie><title>Truncated"))
+                .isInstanceOf(EmbyMovieNfoParser.NfoParseException.class);
+        assertThatThrownBy(() -> parser.parse("not xml at all"))
+                .isInstanceOf(EmbyMovieNfoParser.NfoParseException.class);
+    }
+
+    @Test
+    void rejectsAWellFormedFileWhoseRootIsNotMovie() {
+        assertThatThrownBy(() -> parser.parse("<tvshow><title>Wrong root</title></tvshow>"))
+                .isInstanceOf(EmbyMovieNfoParser.NfoParseException.class);
     }
 
     @Test

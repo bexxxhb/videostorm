@@ -17,6 +17,7 @@ import java.util.List;
  */
 public record StagedMovie(
         String title,
+        boolean derivedTitle,
         String originalTitle,
         int year,
         String normalizedTitle,
@@ -39,16 +40,25 @@ public record StagedMovie(
         ratings = ratings == null ? List.of() : List.copyOf(ratings);
     }
 
-    public static StagedMovie from(ParsedMovie parsed, String sourcePath, String rawNfo) {
+    /**
+     * Builds the staged movie from what was parsed plus its folder context. A metadata title is used
+     * as-is; where none was found the folder name (extension stripped) becomes the title and the entry
+     * is flagged {@link #derivedTitle()}. The normalised keys and identity slug are always computed
+     * from the effective title, so a derived title still sorts, searches and identifies correctly.
+     */
+    public static StagedMovie from(ParsedMovie parsed, String folderName, String sourcePath, String rawNfo) {
+        boolean derivedTitle = parsed.title() == null;
+        String title = DerivedTitle.resolve(parsed.title(), folderName);
         int year = parsed.year() == null ? 0 : parsed.year();
         String originalTitle = parsed.originalTitle();
         return new StagedMovie(
-                parsed.title(),
+                title,
+                derivedTitle,
                 originalTitle,
                 year,
-                TitleNormalizer.normalize(parsed.title()),
+                TitleNormalizer.normalize(title),
                 originalTitle == null ? null : TitleNormalizer.normalize(originalTitle),
-                Slug.forMovie(parsed.title(), year),
+                Slug.forMovie(title, year),
                 sourcePath,
                 rawNfo,
                 new GenreList(parsed.genres()).toStorage(),
