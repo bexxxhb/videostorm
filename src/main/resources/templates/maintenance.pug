@@ -6,6 +6,14 @@ block content
     input(type="hidden", name=csrfParameterName, value=csrfToken)
     button.button(type="submit") Log out
 
+  if unreachablePaths
+    section.preflight-error(role="alert")
+      h2 Re-index aborted
+      p.preflight-error__lead The #{unreachableType} re-index did not run: these source paths are unreachable. The catalogue was left untouched.
+      ul.preflight-error__paths
+        each path in unreachablePaths
+          li= path
+
   if activeRun
     section.run-status
       h2 Run in progress

@@ -2,6 +2,7 @@ package de.videostorm.maintenance.adapter.in.web;
 
 import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.indexing.application.port.out.LibraryScan;
+import de.videostorm.indexing.application.port.out.MountPreflight;
 import de.videostorm.indexing.domain.RunCounts;
 import de.videostorm.sources.domain.SourceType;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -51,6 +53,14 @@ class IndexingRunIT extends PostgresIntegrationTestBase {
         @Primary
         GatedScan gatedScan() {
             return new GatedScan();
+        }
+
+        // The configured path does not exist on the test host; this run exercises the lifecycle,
+        // not the pre-flight, so report every path reachable and let the trigger through.
+        @Bean
+        @Primary
+        MountPreflight allReachable() {
+            return type -> List.of();
         }
     }
 

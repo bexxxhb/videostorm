@@ -159,6 +159,23 @@ body {
     background: #f4f4f4;
 }
 
+.preflight-error {
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid #a12a2a;
+    background: #fbeeee;
+}
+
+.preflight-error__lead {
+    margin: 0 0 0.5rem;
+}
+
+.preflight-error__paths {
+    margin: 0;
+    padding-left: 1.25rem;
+    font-family: monospace;
+}
+
 .run-status__line {
     margin: 0;
 }

@@ -1,11 +1,14 @@
 package de.videostorm.indexing.application;
 
 import de.videostorm.indexing.application.port.in.TriggerResult;
+import de.videostorm.indexing.application.port.out.CataloguePromotion;
 import de.videostorm.indexing.application.port.out.IndexingRunRepository;
 import de.videostorm.indexing.application.port.out.LibraryScan;
+import de.videostorm.indexing.application.port.out.MountPreflight;
 import de.videostorm.indexing.domain.IndexingRun;
 import de.videostorm.indexing.domain.RunCounts;
 import de.videostorm.indexing.domain.RunStatus;
+import de.videostorm.sources.domain.SourcePath;
 import de.videostorm.sources.domain.SourceType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +35,8 @@ class IndexingServiceTest {
     private InMemoryRunRepository repository;
     private ManualExecutor executor;
     private StubScan scan;
+    private StubPromotion promotion;
+    private StubMountPreflight mountPreflight;
     private IndexingService service;
 
     @BeforeEach
@@ -39,14 +44,17 @@ class IndexingServiceTest {
         repository = new InMemoryRunRepository();
         executor = new ManualExecutor();
         scan = new StubScan();
-        service = new IndexingService(repository, scan, executor, Clock.fixed(NOW, ZoneOffset.UTC));
+        promotion = new StubPromotion();
+        mountPreflight = new StubMountPreflight();
+        service = new IndexingService(repository, scan, promotion, mountPreflight, executor,
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     @Test
     void triggerPersistsAnActiveRunAndReturnsBeforeTheScanRuns() {
         TriggerResult result = service.trigger(SourceType.MOVIES);
 
-        assertThat(result).isEqualTo(TriggerResult.STARTED);
+        assertThat(result.outcome()).isEqualTo(TriggerResult.Outcome.STARTED);
         assertThat(executor.pending).hasSize(1);
         assertThat(repository.findActiveRun()).hasValueSatisfying(run -> {
             assertThat(run.status()).isEqualTo(RunStatus.RUNNING);
@@ -61,7 +69,7 @@ class IndexingServiceTest {
 
         TriggerResult second = service.trigger(SourceType.SHOWS);
 
-        assertThat(second).isEqualTo(TriggerResult.ALREADY_RUNNING);
+        assertThat(second.outcome()).isEqualTo(TriggerResult.Outcome.ALREADY_RUNNING);
         assertThat(executor.pending).hasSize(1);
         assertThat(repository.all).hasSize(1);
     }
@@ -81,8 +89,38 @@ class IndexingServiceTest {
     }
 
     @Test
+    void aSuccessfulScanPromotesTheStagedCatalogueForItsType() {
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        assertThat(promotion.promotedTypes).containsExactly(SourceType.MOVIES);
+    }
+
+    @Test
     void aScanThatThrowsSettlesTheRunAsFailedRatherThanLeavingItActive() {
         scan.failure = new IllegalStateException("boom");
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        assertThat(repository.findActiveRun()).isEmpty();
+        assertThat(repository.all.get(0).status()).isEqualTo(RunStatus.FAILED);
+    }
+
+    @Test
+    void aScanThatThrowsIsNeverPromoted() {
+        scan.failure = new IllegalStateException("boom");
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        assertThat(promotion.promotedTypes).isEmpty();
+    }
+
+    @Test
+    void aPromotionThatThrowsSettlesTheRunAsFailed() {
+        promotion.failure = new IllegalStateException("swap failed");
         service.trigger(SourceType.MOVIES);
 
         executor.runAll();
@@ -98,8 +136,43 @@ class IndexingServiceTest {
 
         TriggerResult again = service.trigger(SourceType.SHOWS);
 
-        assertThat(again).isEqualTo(TriggerResult.STARTED);
+        assertThat(again.outcome()).isEqualTo(TriggerResult.Outcome.STARTED);
         assertThat(repository.all).hasSize(2);
+    }
+
+    @Test
+    void aTriggerWithUnreachablePathsIsAbortedNamingEveryFailingPath() {
+        mountPreflight.unreachable = List.of(
+                SourcePath.of("/media/movies"), SourcePath.of("/mnt/films"));
+
+        TriggerResult result = service.trigger(SourceType.MOVIES);
+
+        assertThat(result.outcome()).isEqualTo(TriggerResult.Outcome.PATHS_UNREACHABLE);
+        assertThat(result.unreachablePaths()).containsExactly("/media/movies", "/mnt/films");
+    }
+
+    @Test
+    void aPreflightAbortPersistsNoRunAndNeverReachesTheScan() {
+        mountPreflight.unreachable = List.of(SourcePath.of("/media/movies"));
+
+        service.trigger(SourceType.MOVIES);
+
+        assertThat(repository.all).isEmpty();
+        assertThat(executor.pending).isEmpty();
+        assertThat(scan.calls).isZero();
+    }
+
+    @Test
+    void aRunProceedsOnlyOnceEveryPathIsReachable() {
+        mountPreflight.unreachable = List.of(SourcePath.of("/media/movies"));
+        assertThat(service.trigger(SourceType.MOVIES).outcome())
+                .isEqualTo(TriggerResult.Outcome.PATHS_UNREACHABLE);
+
+        mountPreflight.unreachable = List.of();
+
+        assertThat(service.trigger(SourceType.MOVIES).outcome())
+                .isEqualTo(TriggerResult.Outcome.STARTED);
+        assertThat(repository.all).hasSize(1);
     }
 
     @Test
@@ -153,6 +226,28 @@ class IndexingServiceTest {
                 throw failure;
             }
             return counts;
+        }
+    }
+
+    private static final class StubMountPreflight implements MountPreflight {
+        private List<SourcePath> unreachable = List.of();
+
+        @Override
+        public List<SourcePath> unreachable(SourceType type) {
+            return unreachable;
+        }
+    }
+
+    private static final class StubPromotion implements CataloguePromotion {
+        private final List<SourceType> promotedTypes = new ArrayList<>();
+        private RuntimeException failure;
+
+        @Override
+        public void promote(SourceType type) {
+            if (failure != null) {
+                throw failure;
+            }
+            promotedTypes.add(type);
         }
     }
 

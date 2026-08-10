@@ -5,8 +5,10 @@ package de.videostorm.sources.domain;
  *
  * <p>Configuration supplies raw strings. Construction trims surrounding whitespace, requires the
  * result to be absolute, and strips any trailing slash, so that {@code /media/movies} and
- * {@code /media/movies/} denote the same path. The raw value is exposed only to the startup log
- * and the indexer; it is never rendered in the UI.
+ * {@code /media/movies/} denote the same path. The raw value is kept off the UI as a rule — it
+ * appears in the startup log and the indexer — with one deliberate exception: when a pre-flight
+ * check aborts a re-index, the failing paths are shown to the triggering administrator so they
+ * know which mount to fix.
  */
 public record SourcePath(String value) {
 
