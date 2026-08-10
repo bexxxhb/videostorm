@@ -23,6 +23,8 @@ services:
       db:
         # Flyway runs at startup, so the database must be accepting connections first.
         condition: service_healthy
+    # Run as the host account that owns the media so the read-only mounts are readable.
+    user: "${PUID:-1000}:${PGID:-1000}"
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-videostorm}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-videostorm}
@@ -30,6 +32,13 @@ services:
       # Change these for anything beyond local use - the maintenance login is only as good as this password.
       VIDEOSTORM_ADMIN_USERNAME: ${VIDEOSTORM_ADMIN_USERNAME:-admin}
       VIDEOSTORM_ADMIN_PASSWORD: ${VIDEOSTORM_ADMIN_PASSWORD:-changeme}
+      # Comma-separated source paths, inside the container. They must match the mounts below.
+      VIDEOSTORM_SOURCES_MOVIES: ${VIDEOSTORM_SOURCES_MOVIES:-/media/movies}
+      VIDEOSTORM_SOURCES_SHOWS: ${VIDEOSTORM_SOURCES_SHOWS:-/media/shows}
+    volumes:
+      # The library is bind-mounted read-only: the catalogue can never modify or delete it.
+      - ${VIDEOSTORM_MOVIES_HOST:-./media/movies}:/media/movies:ro
+      - ${VIDEOSTORM_SHOWS_HOST:-./media/shows}:/media/shows:ro
     ports:
       - "8080:8080"
     restart: unless-stopped

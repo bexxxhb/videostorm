@@ -11,9 +11,13 @@ block content
     form.form(method="post", action="/maintenance/movies/reindex")
       input(type="hidden", name=csrfParameterName, value=csrfToken)
       button.button(type="submit", disabled) Re-index movies
+    if !moviesConfigured
+      p.trigger__note No movie source paths are configured; nothing to re-index.
 
   section.trigger
     h2 Shows
     form.form(method="post", action="/maintenance/shows/reindex")
       input(type="hidden", name=csrfParameterName, value=csrfToken)
       button.button(type="submit", disabled) Re-index shows
+    if !showsConfigured
+      p.trigger__note No show source paths are configured; nothing to re-index.

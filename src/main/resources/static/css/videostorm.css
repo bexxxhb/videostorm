@@ -145,3 +145,9 @@ body {
 .trigger {
     margin-bottom: 1.5rem;
 }
+
+.trigger__note {
+    margin: 0.5rem 0 0;
+    color: #6b6b6b;
+    font-size: 0.9rem;
+}

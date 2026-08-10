@@ -4,6 +4,7 @@ import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.config.PugViewConfiguration;
 import de.videostorm.config.security.AdminUserDetailsService;
 import de.videostorm.config.security.SecurityConfig;
+import de.videostorm.sources.config.SourcesConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -28,7 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * dependency, so the full {@link SecurityConfig} filter chain is exercised here directly.
  */
 @WebMvcTest(controllers = {MaintenanceController.class, LoginController.class})
-@Import({SecurityConfig.class, AdminUserDetailsService.class, PugViewConfiguration.class})
+@Import({SecurityConfig.class, AdminUserDetailsService.class, PugViewConfiguration.class,
+        SourcesConfiguration.class})
 @TestPropertySource(properties = {
         "videostorm.admin.username=" + PostgresIntegrationTestBase.ADMIN_USERNAME,
         "videostorm.admin.password=" + PostgresIntegrationTestBase.ADMIN_PASSWORD
