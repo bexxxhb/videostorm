@@ -4,10 +4,13 @@ import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.config.PugViewConfiguration;
 import de.videostorm.config.security.AdminUserDetailsService;
 import de.videostorm.config.security.SecurityConfig;
+import de.videostorm.indexing.application.port.in.IndexingOverview;
 import de.videostorm.indexing.application.port.in.IndexingStatus;
 import de.videostorm.indexing.application.port.in.TriggerReindex;
 import de.videostorm.sources.config.SourcesConfiguration;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
@@ -15,6 +18,8 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -48,6 +53,11 @@ class MaintenanceSecurityTest {
 
     @MockitoBean
     private IndexingStatus indexingStatus;
+
+    @BeforeEach
+    void noRunsByDefault() {
+        Mockito.when(indexingStatus.overview()).thenReturn(IndexingOverview.from(List.of()));
+    }
 
     @Test
     void unauthenticatedRequestsToMaintenanceRedirectToLogin() throws Exception {

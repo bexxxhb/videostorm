@@ -1,5 +1,6 @@
 package de.videostorm.indexing.application;
 
+import de.videostorm.indexing.application.port.in.IndexingOverview;
 import de.videostorm.indexing.application.port.in.IndexingStatus;
 import de.videostorm.indexing.application.port.in.ReconcileRuns;
 import de.videostorm.indexing.application.port.in.TriggerReindex;
@@ -14,8 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
-import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.Executor;
 
 /**
@@ -72,13 +71,8 @@ public class IndexingService implements TriggerReindex, IndexingStatus, Reconcil
     }
 
     @Override
-    public Optional<IndexingRun> activeRun() {
-        return repository.findActiveRun();
-    }
-
-    @Override
-    public List<IndexingRun> recentRuns() {
-        return repository.findRecent(RECENT_LIMIT);
+    public IndexingOverview overview() {
+        return IndexingOverview.from(repository.findRecent(RECENT_LIMIT));
     }
 
     @Override

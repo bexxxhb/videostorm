@@ -1,5 +1,6 @@
 package de.videostorm.maintenance.adapter.in.web;
 
+import de.videostorm.indexing.application.port.in.IndexingOverview;
 import de.videostorm.indexing.application.port.in.IndexingStatus;
 import de.videostorm.indexing.application.port.in.TriggerReindex;
 import de.videostorm.sources.domain.SourcePaths;
@@ -43,12 +44,15 @@ public class MaintenanceController {
     public String maintenance(HttpServletRequest request, Model model) {
         CsrfViewAttributes.exposeTo(request, model);
 
-        Optional<IndexingRunView> activeRun = indexingStatus.activeRun().map(IndexingRunView::of);
+        // Active run and history come from one snapshot, so the page can never show a run as active
+        // and settled at once — as two separate reads could when a scan settles between them.
+        IndexingOverview overview = indexingStatus.overview();
+        Optional<IndexingRunView> activeRun = overview.activeRun().map(IndexingRunView::of);
         boolean runActive = activeRun.isPresent();
+        List<IndexingRunView> recentRuns = overview.recentRuns().stream().map(IndexingRunView::of).toList();
 
         model.addAttribute("moviesConfigured", sourcePaths.hasPathsFor(SourceType.MOVIES));
         model.addAttribute("showsConfigured", sourcePaths.hasPathsFor(SourceType.SHOWS));
-        List<IndexingRunView> recentRuns = recentRuns();
         model.addAttribute("runActive", runActive);
         model.addAttribute("activeRun", activeRun.orElse(null));
         model.addAttribute("recentRuns", recentRuns);
@@ -75,9 +79,5 @@ public class MaintenanceController {
             triggerReindex.trigger(type);
         }
         return "redirect:/maintenance";
-    }
-
-    private List<IndexingRunView> recentRuns() {
-        return indexingStatus.recentRuns().stream().map(IndexingRunView::of).toList();
     }
 }

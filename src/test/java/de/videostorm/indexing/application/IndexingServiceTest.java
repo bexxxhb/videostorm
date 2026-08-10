@@ -103,8 +103,8 @@ class IndexingServiceTest {
     }
 
     @Test
-    void recentRunsAskTheRepositoryForTheLastTen() {
-        service.recentRuns();
+    void theOverviewAsksTheRepositoryForTheLastTenRuns() {
+        service.overview();
 
         assertThat(repository.lastRequestedLimit).isEqualTo(10);
     }

@@ -1,14 +1,11 @@
 package de.videostorm.indexing.application.port.in;
 
-import de.videostorm.indexing.domain.IndexingRun;
-
-import java.util.List;
-import java.util.Optional;
-
-/** What the maintenance page reads: the active run, if any, and a short history of recent runs. */
+/**
+ * What the maintenance page reads: one consistent {@link IndexingOverview snapshot} of the active
+ * run and the recent history, both drawn from a single read so the page can never show a run as
+ * active and settled at the same time.
+ */
 public interface IndexingStatus {
 
-    Optional<IndexingRun> activeRun();
-
-    List<IndexingRun> recentRuns();
+    IndexingOverview overview();
 }
