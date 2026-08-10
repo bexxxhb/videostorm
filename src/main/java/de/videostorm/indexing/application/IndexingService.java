@@ -8,14 +8,17 @@ import de.videostorm.indexing.application.port.in.TriggerResult;
 import de.videostorm.indexing.application.port.out.CataloguePromotion;
 import de.videostorm.indexing.application.port.out.IndexingRunRepository;
 import de.videostorm.indexing.application.port.out.LibraryScan;
+import de.videostorm.indexing.application.port.out.MountPreflight;
 import de.videostorm.indexing.domain.IndexingRun;
 import de.videostorm.indexing.domain.RunCounts;
+import de.videostorm.sources.domain.SourcePath;
 import de.videostorm.sources.domain.SourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.concurrent.Executor;
 
 /**
@@ -30,6 +33,11 @@ import java.util.concurrent.Executor;
  * <p>A successful scan is followed by a {@link CataloguePromotion}, swapping the freshly staged
  * catalogue into live in one step. A scan or promotion that throws settles the run {@code FAILED}
  * and leaves the live catalogue exactly as it was.
+ *
+ * <p>Before any of that, a {@link MountPreflight} check runs under the same lock: if a configured
+ * source path is unreachable the trigger aborts without persisting a run or handing anything to the
+ * executor, so an unmounted drive can never reach the scan and empty the catalogue. The abort is
+ * logged and its failing paths returned to the caller.
  */
 @Service
 public class IndexingService implements TriggerReindex, IndexingStatus, ReconcileRuns {
@@ -41,15 +49,18 @@ public class IndexingService implements TriggerReindex, IndexingStatus, Reconcil
     private final IndexingRunRepository repository;
     private final LibraryScan libraryScan;
     private final CataloguePromotion promotion;
+    private final MountPreflight mountPreflight;
     private final Executor executor;
     private final Clock clock;
     private final Object triggerLock = new Object();
 
     public IndexingService(IndexingRunRepository repository, LibraryScan libraryScan,
-                           CataloguePromotion promotion, Executor indexingExecutor, Clock clock) {
+                           CataloguePromotion promotion, MountPreflight mountPreflight,
+                           Executor indexingExecutor, Clock clock) {
         this.repository = repository;
         this.libraryScan = libraryScan;
         this.promotion = promotion;
+        this.mountPreflight = mountPreflight;
         this.executor = indexingExecutor;
         this.clock = clock;
     }
@@ -59,12 +70,18 @@ public class IndexingService implements TriggerReindex, IndexingStatus, Reconcil
         IndexingRun started;
         synchronized (triggerLock) {
             if (repository.findActiveRun().isPresent()) {
-                return TriggerResult.ALREADY_RUNNING;
+                return TriggerResult.alreadyRunning();
+            }
+            List<SourcePath> unreachable = mountPreflight.unreachable(type);
+            if (!unreachable.isEmpty()) {
+                List<String> paths = unreachable.stream().map(SourcePath::value).toList();
+                log.error("Pre-flight aborted {} re-index: unreachable source paths {}", type, paths);
+                return TriggerResult.pathsUnreachable(paths);
             }
             started = repository.save(IndexingRun.start(type, clock.instant()));
         }
         executor.execute(() -> runScan(started));
-        return TriggerResult.STARTED;
+        return TriggerResult.started();
     }
 
     private void runScan(IndexingRun run) {
