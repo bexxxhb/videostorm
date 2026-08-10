@@ -151,3 +151,40 @@ body {
     color: #6b6b6b;
     font-size: 0.9rem;
 }
+
+.run-status {
+    margin-bottom: 1.5rem;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid var(--accent);
+    background: #f4f4f4;
+}
+
+.run-status__line {
+    margin: 0;
+}
+
+.history {
+    margin-top: 1.5rem;
+}
+
+.history__table {
+    width: 100%;
+    max-width: 48rem;
+    border-collapse: collapse;
+}
+
+.history__table th,
+.history__table td {
+    padding: 0.4rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--rule);
+}
+
+.history__table thead th {
+    border-bottom: 2px solid var(--rule);
+    font-weight: 600;
+}
+
+.history__empty {
+    color: #6b6b6b;
+}
