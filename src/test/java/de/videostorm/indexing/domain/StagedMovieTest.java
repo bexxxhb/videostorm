@@ -65,6 +65,34 @@ class StagedMovieTest {
     }
 
     @Test
+    void derivesTheIdentityTitleFromTheOriginalTitleWherePresent() {
+        StagedMovie staged = StagedMovie.from(parsed(2014, List.of(), List.of()), "Taken 3", "/p", "x");
+
+        // Original title "Taken 3" wins over the display title "96 Hours - Taken 3".
+        assertThat(staged.normalizedIdentityTitle()).isEqualTo("taken 3");
+    }
+
+    @Test
+    void fallsBackToTheDisplayTitleForIdentityWhenNoOriginalTitle() {
+        ParsedMovie noOriginal = new ParsedMovie("The Thing", null, 1982, List.of(), List.of(),
+                null, null, null, null, null, null, null);
+
+        StagedMovie staged = StagedMovie.from(noOriginal, "The Thing (1982)", "/p", "x");
+
+        assertThat(staged.normalizedIdentityTitle()).isEqualTo("the thing");
+    }
+
+    @Test
+    void identityTitleFallsThroughToTheFolderDerivedTitleWhenNothingWasParsed() {
+        ParsedMovie nothing = new ParsedMovie(null, null, null, List.of(), List.of(),
+                null, null, null, null, null, null, null);
+
+        StagedMovie staged = StagedMovie.from(nothing, "The Blob (1958).mkv", "/p", "x");
+
+        assertThat(staged.normalizedIdentityTitle()).isEqualTo("the blob 1958");
+    }
+
+    @Test
     void picksTheProviderEmbyFlaggedDefaultForTheInlineColumns() {
         ParsedRating tmdb = new ParsedRating("themoviedb", new BigDecimal("6.3"), new BigDecimal("10"), 4200, true);
         ParsedRating imdb = new ParsedRating("imdb", new BigDecimal("6.0"), new BigDecimal("10"), 250000, false);

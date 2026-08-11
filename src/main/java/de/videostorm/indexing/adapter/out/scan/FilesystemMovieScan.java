@@ -3,6 +3,7 @@ package de.videostorm.indexing.adapter.out.scan;
 import de.videostorm.indexing.application.port.out.LibraryScan;
 import de.videostorm.indexing.application.port.out.MovieStaging;
 import de.videostorm.indexing.domain.DerivedTitle;
+import de.videostorm.indexing.domain.DuplicateGuard;
 import de.videostorm.indexing.domain.FeatureSelection;
 import de.videostorm.indexing.domain.ParsedMovie;
 import de.videostorm.indexing.domain.RecognizedVideo;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -40,6 +42,11 @@ import java.util.stream.Stream;
  * folder with a metadata file but no video produces no entry and is recorded as a problem. Every gap
  * and every dropped file becomes a {@link RunIssue} on the returned {@link ScanReport}, so the run can
  * report what was thin without anything disappearing silently.
+ *
+ * <p>A {@link DuplicateGuard} spanning the whole run catches the same film appearing in two folders:
+ * the first is staged, the second is skipped and recorded as a duplicate naming both locations. A
+ * duplicate never aborts the run, and two films that merely share a title but differ in year are both
+ * catalogued.
  *
  * <p>Folder and file order is the deterministic codepoint sort, so "the first {@code .nfo}" is a
  * stable choice regardless of the filesystem's own ordering. Shows are not scanned yet: a run for
@@ -70,6 +77,7 @@ class FilesystemMovieScan implements LibraryScan {
         int found = 0;
         int indexed = 0;
         List<RunIssue> issues = new ArrayList<>();
+        DuplicateGuard duplicates = new DuplicateGuard();
         for (SourcePath sourcePath : sourcePaths.pathsFor(SourceType.MOVIES)) {
             Path root = Path.of(sourcePath.value());
             if (!Files.isDirectory(root)) {
@@ -78,7 +86,7 @@ class FilesystemMovieScan implements LibraryScan {
             }
             for (Path folder : sortedChildDirectories(root)) {
                 found++;
-                if (stageMovie(folder, issues)) {
+                if (stageMovie(folder, duplicates, issues)) {
                     indexed++;
                 }
             }
@@ -88,7 +96,7 @@ class FilesystemMovieScan implements LibraryScan {
     }
 
     /** Stages the folder as a movie where it holds a video, appending any issues it turned up. */
-    private boolean stageMovie(Path folder, List<RunIssue> issues) {
+    private boolean stageMovie(Path folder, DuplicateGuard duplicates, List<RunIssue> issues) {
         List<Path> files = sortedRegularFiles(folder);
         List<Path> videos = files.stream()
                 .filter(file -> RecognizedVideo.isVideoFile(file.getFileName().toString()))
@@ -110,9 +118,17 @@ class FilesystemMovieScan implements LibraryScan {
             return false;
         }
 
+        String path = pathOf(folder);
+        StagedMovie movie = StagedMovie.from(parsed, folderName, path, raw);
+        Optional<String> alreadyCatalogued = duplicates.claim(movie, path);
+        if (alreadyCatalogued.isPresent()) {
+            // Same film as a folder already staged this run: skip it, keeping both locations.
+            issues.add(RunIssue.duplicate(path, movie.title(), alreadyCatalogued.get()));
+            return false;
+        }
+
         recordIgnoredVideos(folder, folderName, parsed, videos, issues);
 
-        StagedMovie movie = StagedMovie.from(parsed, folderName, pathOf(folder), raw);
         staging.stage(movie);
         recordThinFields(folder, movie, issues);
         return true;

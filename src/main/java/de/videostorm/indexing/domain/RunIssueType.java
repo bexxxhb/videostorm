@@ -12,10 +12,13 @@ package de.videostorm.indexing.domain;
  *   <li>{@link #NO_VIDEO} — a folder held a metadata file but no video, so it produced no entry.</li>
  *   <li>{@link #IGNORED_VIDEO} — a folder held several videos; this one was not chosen as the feature
  *       and was left out of the catalogue.</li>
+ *   <li>{@link #DUPLICATE} — a folder resolved to a film already catalogued in this run, so it was
+ *       skipped; the location of the film it duplicates is named on the issue.</li>
  * </ul>
  */
 public enum RunIssueType {
     MISSING_FIELD,
     NO_VIDEO,
-    IGNORED_VIDEO
+    IGNORED_VIDEO,
+    DUPLICATE
 }

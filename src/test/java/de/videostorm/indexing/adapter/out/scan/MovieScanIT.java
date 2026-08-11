@@ -205,6 +205,52 @@ class MovieScanIT extends PostgresIntegrationTestBase {
                 });
     }
 
+    @Test
+    void catchesASecondFolderOfTheSameFilmSkipsItAndRecordsBothPaths() {
+        Path first = movieFolder("Heat (1995)", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
+        Path second = movieFolder("Heat backup", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        // Both folders were found; only the first was staged, and the run did not abort.
+        assertThat(report.counts()).isEqualTo(new RunCounts(2, 1));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isEqualTo(1);
+        assertThat(report.issues())
+                .filteredOn(issue -> issue.type() == RunIssueType.DUPLICATE)
+                .singleElement()
+                .satisfies(issue -> {
+                    assertThat(issue.path()).isEqualTo(second.toString());
+                    assertThat(issue.title()).isEqualTo("Heat");
+                    // The already-catalogued location is kept alongside the skipped one.
+                    assertThat(issue.field()).isEqualTo(first.toString());
+                });
+    }
+
+    @Test
+    void cataloguesTwoFilmsThatShareATitleButDifferInYear() {
+        movieFolder("The Thing (1982)", "<movie><title>The Thing</title><year>1982</year></movie>", "thing.mkv");
+        movieFolder("The Thing (2011)", "<movie><title>The Thing</title><year>2011</year></movie>", "thing.mkv");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        assertThat(report.counts()).isEqualTo(new RunCounts(2, 2));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isEqualTo(2);
+        assertThat(report.issues()).noneMatch(issue -> issue.type() == RunIssueType.DUPLICATE);
+    }
+
+    @Test
+    void treatsFoldersDifferingOnlyInDiacriticsAndPunctuationAsTheSameFilm() {
+        movieFolder("Amelie", "<movie><title>Amélie</title><year>2001</year></movie>", "a.mkv");
+        movieFolder("Amelie 2", "<movie><title>amelie!</title><year>2001</year></movie>", "a.mkv");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        assertThat(report.counts()).isEqualTo(new RunCounts(2, 1));
+        assertThat(report.issues())
+                .filteredOn(issue -> issue.type() == RunIssueType.DUPLICATE)
+                .hasSize(1);
+    }
+
     private Path createFolder(String name) {
         Path folder = MOVIES_DIR.resolve(name);
         try {

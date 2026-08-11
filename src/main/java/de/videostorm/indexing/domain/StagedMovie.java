@@ -41,6 +41,16 @@ public record StagedMovie(
     }
 
     /**
+     * The normalised title a film is identified by: the original title where one was parsed, else the
+     * display title (which itself already falls back to the folder-derived name). Mirrors the database's
+     * {@code COALESCE(normalized_original_title, normalized_title)} identity index, so the run's own
+     * duplicate detection and the schema backstop can never disagree on what counts as the same film.
+     */
+    public String normalizedIdentityTitle() {
+        return normalizedOriginalTitle != null ? normalizedOriginalTitle : normalizedTitle;
+    }
+
+    /**
      * Builds the staged movie from what was parsed plus its folder context. A metadata title is used
      * as-is; where none was found the folder name (extension stripped) becomes the title and the entry
      * is flagged {@link #derivedTitle()}. The normalised keys and identity slug are always computed

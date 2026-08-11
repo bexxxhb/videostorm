@@ -108,6 +108,51 @@ class MovieStagingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
+    void theIdentityIndexRejectsASecondFilmWithTheSameIdentityTitleAndYear() {
+        jdbc.update("INSERT INTO movie_staging (title, normalized_title, year, slug) VALUES ('Heat', 'heat', 1995, 'heat-1995')");
+
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO movie_staging (title, normalized_title, year, slug) VALUES ('Heat', 'heat', 1995, 'heat-1995-2')"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void theIdentityIndexTakesTheOriginalTitleWherePresentAndLeavesADifferentYearAlone() {
+        jdbc.update("""
+                INSERT INTO movie_staging (title, normalized_title, normalized_original_title, year, slug)
+                VALUES ('Display One', 'display one', 'shared', 1999, 'a-1999')
+                """);
+
+        // Same identity (the original title) and year: rejected even though the display titles differ.
+        assertThatThrownBy(() -> jdbc.update("""
+                INSERT INTO movie_staging (title, normalized_title, normalized_original_title, year, slug)
+                VALUES ('Display Two', 'display two', 'shared', 1999, 'b-1999')
+                """))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        // A different year is a different film and is admitted.
+        assertThat(jdbc.update("""
+                INSERT INTO movie_staging (title, normalized_title, normalized_original_title, year, slug)
+                VALUES ('Display Three', 'display three', 'shared', 2000, 'c-2000')
+                """)).isEqualTo(1);
+    }
+
+    @Test
+    void theImdbIndexRejectsASecondFilmWithTheSameImdbIdButAllowsManyWithNone() {
+        jdbc.update("INSERT INTO movie_staging (title, normalized_title, year, slug, imdb_id) VALUES ('Heat', 'heat', 1995, 'heat-1995', 'tt0113277')");
+
+        assertThatThrownBy(() -> jdbc.update(
+                "INSERT INTO movie_staging (title, normalized_title, year, slug, imdb_id) VALUES ('Heat Redux', 'heat redux', 1996, 'heat-redux-1996', 'tt0113277')"))
+                .isInstanceOf(DataIntegrityViolationException.class);
+
+        // A null imdb id is not an identity, so two unidentified films sit side by side.
+        jdbc.update("INSERT INTO movie_staging (title, normalized_title, year, slug) VALUES ('Alpha', 'alpha', 2000, 'alpha-2000')");
+        assertThat(jdbc.update(
+                "INSERT INTO movie_staging (title, normalized_title, year, slug) VALUES ('Beta', 'beta', 2001, 'beta-2001')"))
+                .isEqualTo(1);
+    }
+
+    @Test
     void leavesTheLiveCatalogueUntouched() {
         jdbc.update("INSERT INTO movie (title, normalized_title, slug) VALUES ('Live', 'live', 'live-0')");
 
