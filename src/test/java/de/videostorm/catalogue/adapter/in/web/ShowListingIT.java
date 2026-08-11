@@ -40,8 +40,9 @@ class ShowListingIT extends PostgresIntegrationTestBase {
 
     @BeforeEach
     void clearCatalogue() {
-        // Child first: the show_rating FK forbids deleting a show while any live rating remains.
+        // Children first: the show_rating and episode FKs forbid deleting a show while either remains.
         jdbcTemplate.update("DELETE FROM show_rating");
+        jdbcTemplate.update("DELETE FROM episode");
         jdbcTemplate.update("DELETE FROM show");
     }
 

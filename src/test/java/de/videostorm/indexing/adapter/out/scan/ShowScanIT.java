@@ -50,8 +50,10 @@ class ShowScanIT extends PostgresIntegrationTestBase {
     @BeforeEach
     void reset() {
         jdbc.update("DELETE FROM show_rating_staging");
+        jdbc.update("DELETE FROM episode_staging");
         jdbc.update("DELETE FROM show_staging");
         jdbc.update("DELETE FROM show_rating");
+        jdbc.update("DELETE FROM episode");
         jdbc.update("DELETE FROM show");
         emptyLibrary();
     }
@@ -175,6 +177,109 @@ class ShowScanIT extends PostgresIntegrationTestBase {
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isEqualTo(1);
+    }
+
+    @Test
+    void collectsEpisodesRecursivelyAtAnyDepthAndStoresSeasonAndEpisode() {
+        Path show = showFolder("Firefly (2002)",
+                "<tvshow><title>Firefly</title><premiered>2002-09-20</premiered></tvshow>");
+        episodeFile(show, "Season 01/S01E01.mkv");
+        episodeFile(show, "Season 01/S01E02.mkv");
+        episodeFile(show, "Season 02/Episode 1/S02E01.mkv"); // a per-episode subfolder, one level deeper
+        write(show.resolve("poster.jpg"), "not a video"); // artwork is ignored
+
+        ScanReport report = scan.scan(SourceType.SHOWS);
+
+        assertThat(episodesOf("firefly")).containsExactly("S1E1", "S1E2", "S2E1");
+        assertThat(report.issues()).noneMatch(issue -> issue.type() == RunIssueType.SKIPPED_EPISODE);
+    }
+
+    @Test
+    void extractsEverySupportedPatternThroughTheRealScan() {
+        Path show = showFolder("Patterns", "<tvshow><title>Patterns</title></tvshow>");
+        episodeFile(show, "S03E01.mkv");  // #1 -> S3E1
+        episodeFile(show, "s03e05.mkv");  // #2 -> S3E5
+        episodeFile(show, "Ep.02.mkv");   // #3 -> S1E2
+        episodeFile(show, "103.mkv");     // #4 -> S1E3
+        episodeFile(show, "6.06.mkv");    // #5 -> S6E6
+        episodeFile(show, "s03.e11.mkv"); // #6 -> S3E11
+        episodeFile(show, "s4e05.mkv");   // #7 -> S4E5
+        episodeFile(show, "s5.e06.mkv");  // #8 -> S5E6
+
+        scan.scan(SourceType.SHOWS);
+
+        assertThat(episodesOf("patterns")).containsExactlyInAnyOrder(
+                "S3E1", "S3E5", "S1E2", "S1E3", "S6E6", "S3E11", "S4E5", "S5E6");
+    }
+
+    @Test
+    void skipsAndReportsAFileWhoseNumberCannotBeParsed() {
+        Path show = showFolder("Mixed", "<tvshow><title>Mixed</title></tvshow>");
+        episodeFile(show, "S01E01.mkv");
+        episodeFile(show, "Behind the Scenes.mkv"); // no pattern -> skipped, not guessed
+
+        ScanReport report = scan.scan(SourceType.SHOWS);
+
+        assertThat(episodesOf("mixed")).containsExactly("S1E1");
+        assertThat(report.issues()).anySatisfy(issue -> {
+            assertThat(issue.type()).isEqualTo(RunIssueType.SKIPPED_EPISODE);
+            assertThat(issue.path()).isEqualTo(show.resolve("Behind the Scenes.mkv").toString());
+            assertThat(issue.title()).isEqualTo("Mixed");
+        });
+    }
+
+    @Test
+    void keepsTheFirstAndReportsTheSecondWhenTwoFilesResolveToTheSameEpisode() {
+        Path show = showFolder("Ambiguous Show", "<tvshow><title>Ambiguous Show</title></tvshow>");
+        // Both resolve to S01E01; "1.01.mkv" sorts before "S01E01.mkv" in codepoint order, so it is kept.
+        episodeFile(show, "1.01.mkv");
+        episodeFile(show, "S01E01.mkv");
+
+        ScanReport report = scan.scan(SourceType.SHOWS);
+
+        assertThat(episodesOf("ambiguous show")).containsExactly("S1E1");
+        assertThat(report.issues()).anySatisfy(issue -> {
+            assertThat(issue.type()).isEqualTo(RunIssueType.DUPLICATE);
+            assertThat(issue.path()).isEqualTo(show.resolve("S01E01.mkv").toString());
+            assertThat(issue.field()).isEqualTo(show.resolve("1.01.mkv").toString());
+        });
+    }
+
+    @Test
+    void cataloguesAShowWithZeroEpisodesWhenEveryFileFailsToParse() {
+        Path show = showFolder("Odd Naming", "<tvshow><title>Odd Naming</title></tvshow>");
+        episodeFile(show, "Pilot.mkv");
+        episodeFile(show, "Finale.mkv");
+
+        scan.scan(SourceType.SHOWS);
+
+        // The show is still catalogued; it simply has no episodes.
+        assertThat(jdbc.queryForObject(
+                "SELECT title FROM show_staging WHERE normalized_title = 'odd naming'", String.class))
+                .isEqualTo("Odd Naming");
+        assertThat(episodesOf("odd naming")).isEmpty();
+    }
+
+    /** The episodes staged for a show as {@code S<season>E<episode>}, ordered by season then episode. */
+    private List<String> episodesOf(String normalizedTitle) {
+        return jdbc.query("""
+                SELECT e.season_number, e.episode_number
+                FROM episode_staging e JOIN show_staging s ON s.id = e.show_id
+                WHERE s.normalized_title = ?
+                ORDER BY e.season_number, e.episode_number
+                """,
+                (rs, row) -> "S" + rs.getInt("season_number") + "E" + rs.getInt("episode_number"),
+                normalizedTitle);
+    }
+
+    private void episodeFile(Path showFolder, String relativePath) {
+        Path file = showFolder.resolve(relativePath);
+        try {
+            Files.createDirectories(file.getParent());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        write(file, "");
     }
 
     private Path createFolder(String name) {

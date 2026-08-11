@@ -12,13 +12,17 @@ package de.videostorm.indexing.domain;
  *   <li>{@link #NO_VIDEO} — a folder held a metadata file but no video, so it produced no entry.</li>
  *   <li>{@link #IGNORED_VIDEO} — a folder held several videos; this one was not chosen as the feature
  *       and was left out of the catalogue.</li>
- *   <li>{@link #DUPLICATE} — a folder resolved to a film already catalogued in this run, so it was
- *       skipped; the location of the film it duplicates is named on the issue.</li>
+ *   <li>{@link #DUPLICATE} — a folder resolved to a film already catalogued in this run, or an episode
+ *       file resolved to a season and episode already claimed under its show, so it was skipped; the
+ *       location it duplicates is named on the issue.</li>
+ *   <li>{@link #SKIPPED_EPISODE} — an episode file whose season and episode number could not be parsed
+ *       from its filename, so it was left out of the catalogue rather than stored under a guess.</li>
  * </ul>
  */
 public enum RunIssueType {
     MISSING_FIELD,
     NO_VIDEO,
     IGNORED_VIDEO,
-    DUPLICATE
+    DUPLICATE,
+    SKIPPED_EPISODE
 }

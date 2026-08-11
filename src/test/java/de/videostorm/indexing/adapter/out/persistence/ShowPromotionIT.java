@@ -26,8 +26,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Sql(statements = {
-        "DELETE FROM show_rating_staging", "DELETE FROM show_staging",
-        "DELETE FROM show_rating", "DELETE FROM show",
+        "DELETE FROM show_rating_staging", "DELETE FROM episode_staging", "DELETE FROM show_staging",
+        "DELETE FROM show_rating", "DELETE FROM episode", "DELETE FROM show",
         "DELETE FROM movie_rating", "DELETE FROM movie"
 }, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class ShowPromotionIT extends PostgresIntegrationTestBase {

@@ -39,10 +39,19 @@ public record RunIssue(RunIssueType type, String path, String title, String fiel
     }
 
     /**
-     * A folder skipped because it resolved to a film already catalogued in this run. Both locations
-     * are kept: {@code path} is the skipped folder, {@code originalPath} the film it duplicates.
+     * A folder skipped because it resolved to a film already catalogued in this run, or an episode file
+     * skipped because it resolved to a season and episode already claimed under its show. Both
+     * locations are kept: {@code path} is the skipped entry, {@code originalPath} the one it duplicates.
      */
     public static RunIssue duplicate(String path, String title, String originalPath) {
         return new RunIssue(RunIssueType.DUPLICATE, path, title, originalPath);
+    }
+
+    /**
+     * An episode file whose number could not be parsed from its filename, so it was left out of the
+     * catalogue. {@code title} carries the show it sits under, for context in the report.
+     */
+    public static RunIssue skippedEpisode(String path, String title) {
+        return new RunIssue(RunIssueType.SKIPPED_EPISODE, path, title, null);
     }
 }
