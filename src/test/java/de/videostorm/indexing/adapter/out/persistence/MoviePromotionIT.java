@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Sql(statements = {
         "DELETE FROM movie_rating_staging", "DELETE FROM movie_staging",
         "DELETE FROM movie_rating", "DELETE FROM movie",
-        "DELETE FROM show"
+        "DELETE FROM show_rating", "DELETE FROM show"
 }, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class MoviePromotionIT extends PostgresIntegrationTestBase {
 

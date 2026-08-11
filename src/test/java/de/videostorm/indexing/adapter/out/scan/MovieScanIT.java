@@ -122,9 +122,11 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void doesNotScanShowsYet() {
+    void scanningShowsDoesNotTouchMovieStaging() {
         movieFolder("A Movie", "<movie><title>A</title></movie>", "a.mkv");
 
+        // No show source path is configured here, so the show scan finds nothing; either way it must
+        // never write the movie staging tables — the two types are scoped apart.
         ScanReport report = scan.scan(SourceType.SHOWS);
 
         assertThat(report.counts()).isEqualTo(RunCounts.none());

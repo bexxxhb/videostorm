@@ -113,15 +113,15 @@ class EmbyMovieNfoParserTest {
     @Test
     void rejectsAStructurallyBrokenFileSoTheScanCanTreatItAsAbsent() {
         assertThatThrownBy(() -> parser.parse("<movie><title>Truncated"))
-                .isInstanceOf(EmbyMovieNfoParser.NfoParseException.class);
+                .isInstanceOf(NfoParseException.class);
         assertThatThrownBy(() -> parser.parse("not xml at all"))
-                .isInstanceOf(EmbyMovieNfoParser.NfoParseException.class);
+                .isInstanceOf(NfoParseException.class);
     }
 
     @Test
     void rejectsAWellFormedFileWhoseRootIsNotMovie() {
         assertThatThrownBy(() -> parser.parse("<tvshow><title>Wrong root</title></tvshow>"))
-                .isInstanceOf(EmbyMovieNfoParser.NfoParseException.class);
+                .isInstanceOf(NfoParseException.class);
     }
 
     @Test
