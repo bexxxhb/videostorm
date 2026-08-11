@@ -180,6 +180,15 @@ body {
     margin: 0;
 }
 
+.gaps {
+    margin-top: 1.5rem;
+}
+
+.gaps__list {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
 .history {
     margin-top: 1.5rem;
 }

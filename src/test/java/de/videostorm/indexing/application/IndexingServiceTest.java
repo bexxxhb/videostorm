@@ -117,6 +117,25 @@ class IndexingServiceTest {
     }
 
     @Test
+    void aSuccessfulRunPrunesDetailBeyondTheRetentionWindow() {
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        assertThat(runIssues.pruneLimits).containsExactly(RunIssueRepository.DETAIL_RETENTION_LIMIT);
+    }
+
+    @Test
+    void aFailedScanPrunesNothing() {
+        scan.failure = new IllegalStateException("boom");
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        assertThat(runIssues.pruneLimits).isEmpty();
+    }
+
+    @Test
     void aSuccessfulScanPromotesTheStagedCatalogueForItsType() {
         service.trigger(SourceType.MOVIES);
 
@@ -204,10 +223,13 @@ class IndexingServiceTest {
     }
 
     @Test
-    void theOverviewAsksTheRepositoryForTheLastTenRuns() {
-        service.overview();
+    void theOverviewReturnsTheWholeRunHistory() {
+        service.trigger(SourceType.MOVIES);
+        executor.runAll();
+        service.trigger(SourceType.SHOWS);
+        executor.runAll();
 
-        assertThat(repository.lastRequestedLimit).isEqualTo(10);
+        assertThat(service.overview().history()).hasSize(2);
     }
 
     @Test
@@ -257,15 +279,26 @@ class IndexingServiceTest {
         }
     }
 
-    /** Captures the issues each completed run recorded, keyed by run id. */
+    /** Captures the issues each completed run recorded, keyed by run id, and any pruning. */
     private static final class RecordingRunIssues implements RunIssueRepository {
         private final List<Long> recordedRunIds = new ArrayList<>();
+        private final List<Integer> pruneLimits = new ArrayList<>();
         private List<RunIssue> lastRecorded = List.of();
 
         @Override
         public void record(long runId, List<RunIssue> issues) {
             recordedRunIds.add(runId);
             lastRecorded = List.copyOf(issues);
+        }
+
+        @Override
+        public List<RunIssue> findByRun(long runId) {
+            return List.of();
+        }
+
+        @Override
+        public void pruneDetailBeyond(int retainedRuns) {
+            pruneLimits.add(retainedRuns);
         }
     }
 
@@ -295,7 +328,6 @@ class IndexingServiceTest {
     private static final class InMemoryRunRepository implements IndexingRunRepository {
         private final List<IndexingRun> all = new ArrayList<>();
         private long sequence;
-        private int lastRequestedLimit;
 
         @Override
         public IndexingRun save(IndexingRun run) {
@@ -321,7 +353,11 @@ class IndexingServiceTest {
 
         @Override
         public List<IndexingRun> findRecent(int limit) {
-            lastRequestedLimit = limit;
+            return all.stream().limit(limit).toList();
+        }
+
+        @Override
+        public List<IndexingRun> findAll() {
             return List.copyOf(all);
         }
 

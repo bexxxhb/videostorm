@@ -37,6 +37,14 @@ class IndexingRunRepositoryAdapter implements IndexingRunRepository {
                 .toList();
     }
 
+    @Override
+    public List<IndexingRun> findAll() {
+        return jpaRepository.findAllByOrderByStartedAtDesc()
+                .stream()
+                .map(IndexingRunRepositoryAdapter::toDomain)
+                .toList();
+    }
+
     private static IndexingRunEntity toEntity(IndexingRun run) {
         IndexingRunEntity entity = new IndexingRunEntity();
         entity.setId(run.id());

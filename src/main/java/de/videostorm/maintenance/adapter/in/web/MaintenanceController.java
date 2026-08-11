@@ -2,19 +2,28 @@ package de.videostorm.maintenance.adapter.in.web;
 
 import de.videostorm.indexing.application.port.in.IndexingOverview;
 import de.videostorm.indexing.application.port.in.IndexingStatus;
+import de.videostorm.indexing.application.port.in.RunReports;
 import de.videostorm.indexing.application.port.in.TriggerReindex;
 import de.videostorm.indexing.application.port.in.TriggerResult;
+import de.videostorm.indexing.domain.RunGapSummary;
 import de.videostorm.sources.domain.SourcePaths;
 import de.videostorm.sources.domain.SourceType;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The gated maintenance shell. A type's re-index trigger is offered only when that type has source
@@ -41,12 +50,14 @@ public class MaintenanceController {
     private final SourcePaths sourcePaths;
     private final TriggerReindex triggerReindex;
     private final IndexingStatus indexingStatus;
+    private final RunReports runReports;
 
     public MaintenanceController(SourcePaths sourcePaths, TriggerReindex triggerReindex,
-                                 IndexingStatus indexingStatus) {
+                                 IndexingStatus indexingStatus, RunReports runReports) {
         this.sourcePaths = sourcePaths;
         this.triggerReindex = triggerReindex;
         this.indexingStatus = indexingStatus;
+        this.runReports = runReports;
     }
 
     @GetMapping("/maintenance")
@@ -56,21 +67,40 @@ public class MaintenanceController {
         // Active run and history come from one snapshot, so the page can never show a run as active
         // and settled at once — as two separate reads could when a scan settles between them.
         IndexingOverview overview = indexingStatus.overview();
-        Optional<IndexingRunView> activeRun = overview.activeRun().map(IndexingRunView::of);
+        Set<Long> downloadableRunIds = runReports.downloadableRunIds();
+        Optional<IndexingRunView> activeRun =
+                overview.activeRun().map(run -> IndexingRunView.of(run, false));
         boolean runActive = activeRun.isPresent();
-        List<IndexingRunView> recentRuns = overview.recentRuns().stream().map(IndexingRunView::of).toList();
+        List<IndexingRunView> history = overview.history().stream()
+                .map(run -> IndexingRunView.of(run, downloadableRunIds.contains(run.id())))
+                .toList();
+
+        RunGapSummary gaps = runReports.lastRunGaps();
 
         model.addAttribute("moviesConfigured", sourcePaths.hasPathsFor(SourceType.MOVIES));
         model.addAttribute("showsConfigured", sourcePaths.hasPathsFor(SourceType.SHOWS));
         model.addAttribute("runActive", runActive);
         model.addAttribute("activeRun", activeRun.orElse(null));
-        model.addAttribute("recentRuns", recentRuns);
-        model.addAttribute("hasRuns", !recentRuns.isEmpty());
+        model.addAttribute("runs", history);
+        model.addAttribute("hasRuns", !history.isEmpty());
+        model.addAttribute("titleGaps", gaps.titleGaps());
+        model.addAttribute("yearGaps", gaps.yearGaps());
         if (runActive) {
             model.addAttribute("metaRefreshSeconds", META_REFRESH_SECONDS);
         }
 
         return "maintenance";
+    }
+
+    @GetMapping("/maintenance/runs/{runId}/report.csv")
+    public ResponseEntity<byte[]> downloadReport(@PathVariable long runId) {
+        return runReports.download(runId)
+                .map(report -> ResponseEntity.ok()
+                        .contentType(new MediaType("text", "csv", StandardCharsets.UTF_8))
+                        .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                                .filename(report.filename()).build().toString())
+                        .body(report.content()))
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping("/maintenance/movies/reindex")

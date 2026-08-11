@@ -6,7 +6,9 @@ import de.videostorm.config.security.AdminUserDetailsService;
 import de.videostorm.config.security.SecurityConfig;
 import de.videostorm.indexing.application.port.in.IndexingOverview;
 import de.videostorm.indexing.application.port.in.IndexingStatus;
+import de.videostorm.indexing.application.port.in.RunReports;
 import de.videostorm.indexing.application.port.in.TriggerReindex;
+import de.videostorm.indexing.domain.RunGapSummary;
 import de.videostorm.sources.config.SourcesConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,9 +56,14 @@ class MaintenanceSecurityTest {
     @MockitoBean
     private IndexingStatus indexingStatus;
 
+    @MockitoBean
+    private RunReports runReports;
+
     @BeforeEach
     void noRunsByDefault() {
         Mockito.when(indexingStatus.overview()).thenReturn(IndexingOverview.from(List.of()));
+        Mockito.when(runReports.lastRunGaps()).thenReturn(RunGapSummary.none());
+        Mockito.when(runReports.downloadableRunIds()).thenReturn(java.util.Set.of());
     }
 
     @Test

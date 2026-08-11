@@ -43,8 +43,6 @@ import java.util.concurrent.Executor;
 @Service
 public class IndexingService implements TriggerReindex, IndexingStatus, ReconcileRuns {
 
-    static final int RECENT_LIMIT = 10;
-
     private static final Logger log = LoggerFactory.getLogger(IndexingService.class);
 
     private final IndexingRunRepository repository;
@@ -92,6 +90,7 @@ public class IndexingService implements TriggerReindex, IndexingStatus, Reconcil
             ScanReport report = libraryScan.scan(run.type());
             promotion.promote(run.type());
             runIssues.record(run.id(), report.issues());
+            runIssues.pruneDetailBeyond(RunIssueRepository.DETAIL_RETENTION_LIMIT);
             repository.save(run.complete(report.counts(), clock.instant()));
         } catch (RuntimeException e) {
             log.error("Indexing run {} for {} failed", run.id(), run.type(), e);
@@ -101,7 +100,7 @@ public class IndexingService implements TriggerReindex, IndexingStatus, Reconcil
 
     @Override
     public IndexingOverview overview() {
-        return IndexingOverview.from(repository.findRecent(RECENT_LIMIT));
+        return IndexingOverview.from(repository.findAll());
     }
 
     @Override
