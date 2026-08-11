@@ -24,6 +24,17 @@ class RunIssueTest {
     }
 
     @Test
+    void aDuplicateRecordsBothTheSkippedAndTheAlreadyCataloguedPath() {
+        RunIssue issue = RunIssue.duplicate("/m/Heat (dup)", "Heat", "/m/Heat");
+
+        assertThat(issue.type()).isEqualTo(RunIssueType.DUPLICATE);
+        assertThat(issue.path()).isEqualTo("/m/Heat (dup)");
+        assertThat(issue.title()).isEqualTo("Heat");
+        // The already-catalogued location is carried in the detail slot.
+        assertThat(issue.field()).isEqualTo("/m/Heat");
+    }
+
+    @Test
     void refusesABlankPath() {
         assertThatThrownBy(() -> RunIssue.noVideo("  ", "x"))
                 .isInstanceOf(IllegalArgumentException.class);
