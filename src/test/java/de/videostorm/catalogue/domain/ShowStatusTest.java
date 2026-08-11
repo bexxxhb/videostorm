@@ -20,4 +20,18 @@ class ShowStatusTest {
     void unknownRendersLowercase() {
         assertThat(ShowStatus.UNKNOWN.displayLabel()).isEqualTo("unknown");
     }
+
+    @Test
+    void mapsEndedAndContinuingCaseAndWhitespaceInsensitively() {
+        assertThat(ShowStatus.fromNfo("Ended")).isEqualTo(ShowStatus.ENDED);
+        assertThat(ShowStatus.fromNfo("  continuing ")).isEqualTo(ShowStatus.CONTINUING);
+        assertThat(ShowStatus.fromNfo("ENDED")).isEqualTo(ShowStatus.ENDED);
+    }
+
+    @Test
+    void defaultsToUnknownForAbsentBlankOrUnrecognisedValues() {
+        assertThat(ShowStatus.fromNfo(null)).isEqualTo(ShowStatus.UNKNOWN);
+        assertThat(ShowStatus.fromNfo("")).isEqualTo(ShowStatus.UNKNOWN);
+        assertThat(ShowStatus.fromNfo("Cancelled")).isEqualTo(ShowStatus.UNKNOWN);
+    }
 }

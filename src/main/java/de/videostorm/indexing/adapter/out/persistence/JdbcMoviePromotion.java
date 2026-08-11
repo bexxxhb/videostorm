@@ -1,6 +1,5 @@
 package de.videostorm.indexing.adapter.out.persistence;
 
-import de.videostorm.indexing.application.port.out.CataloguePromotion;
 import de.videostorm.sources.domain.SourceType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,8 +8,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Promotes staged movies into the live catalogue in one transaction. Shows are not imported yet, so a
- * promotion for {@link SourceType#SHOWS} does nothing, mirroring the scan.
+ * Promotes staged movies into the live catalogue in one transaction.
  *
  * <p>The swap uses {@code DELETE} rather than {@code TRUNCATE} so concurrent readers are never blocked
  * during it: under MVCC a listing loaded throughout the run keeps its snapshot of the previous rows
@@ -20,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
  * child of the movie foreign key, so live rows are deleted child-first and inserted parent-first.
  */
 @Repository
-class JdbcMoviePromotion implements CataloguePromotion {
+class JdbcMoviePromotion implements CataloguePromotor {
 
     private static final Logger log = LoggerFactory.getLogger(JdbcMoviePromotion.class);
 
@@ -31,11 +29,13 @@ class JdbcMoviePromotion implements CataloguePromotion {
     }
 
     @Override
+    public SourceType type() {
+        return SourceType.MOVIES;
+    }
+
+    @Override
     @Transactional
-    public void promote(SourceType type) {
-        if (type != SourceType.MOVIES) {
-            return;
-        }
+    public void promote() {
         jdbc.update("DELETE FROM movie_rating");
         jdbc.update("DELETE FROM movie");
         int movies = jdbc.update("INSERT INTO movie OVERRIDING SYSTEM VALUE SELECT * FROM movie_staging");

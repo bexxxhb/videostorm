@@ -1,6 +1,5 @@
 package de.videostorm.indexing.adapter.out.scan;
 
-import de.videostorm.indexing.application.port.out.LibraryScan;
 import de.videostorm.indexing.application.port.out.MovieStaging;
 import de.videostorm.indexing.domain.DerivedTitle;
 import de.videostorm.indexing.domain.DuplicateGuard;
@@ -49,11 +48,12 @@ import java.util.stream.Stream;
  * catalogued.
  *
  * <p>Folder and file order is the deterministic codepoint sort, so "the first {@code .nfo}" is a
- * stable choice regardless of the filesystem's own ordering. Shows are not scanned yet: a run for
- * {@link SourceType#SHOWS} reports nothing found until a later ticket implements it.
+ * stable choice regardless of the filesystem's own ordering. This adapter scans movies only; shows
+ * have their own {@link FilesystemShowScan}, and {@link RoutingLibraryScan} routes a run to the right
+ * one by type.
  */
 @Component
-class FilesystemMovieScan implements LibraryScan {
+class FilesystemMovieScan implements SourceScan {
 
     private static final Logger log = LoggerFactory.getLogger(FilesystemMovieScan.class);
     private static final String NFO_EXTENSION = ".nfo";
@@ -68,10 +68,12 @@ class FilesystemMovieScan implements LibraryScan {
     }
 
     @Override
-    public ScanReport scan(SourceType type) {
-        if (type != SourceType.MOVIES) {
-            return ScanReport.none();
-        }
+    public SourceType type() {
+        return SourceType.MOVIES;
+    }
+
+    @Override
+    public ScanReport scan() {
         staging.clear();
 
         int found = 0;
@@ -165,7 +167,7 @@ class FilesystemMovieScan implements LibraryScan {
         }
         try {
             return parser.parse(raw);
-        } catch (EmbyMovieNfoParser.NfoParseException e) {
+        } catch (NfoParseException e) {
             // A truncated, non-XML or wrong-rooted file is treated exactly as an absent one.
             log.warn("Unreadable .nfo treated as absent: {}", e.getMessage());
             return ParsedMovie.absent();
