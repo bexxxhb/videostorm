@@ -6,6 +6,7 @@ import de.videostorm.indexing.domain.DuplicateGuard;
 import de.videostorm.indexing.domain.FeatureSelection;
 import de.videostorm.indexing.domain.ParsedMovie;
 import de.videostorm.indexing.domain.RecognizedVideo;
+import de.videostorm.indexing.domain.Resolution;
 import de.videostorm.indexing.domain.RunCounts;
 import de.videostorm.indexing.domain.RunIssue;
 import de.videostorm.indexing.domain.ScanReport;
@@ -121,7 +122,17 @@ class FilesystemMovieScan implements SourceScan {
         }
 
         String path = pathOf(folder);
-        StagedMovie movie = StagedMovie.from(parsed, folderName, path, raw);
+        // A single feature selection drives both the resolution (read from the feature, never a trailer
+        // or sample) and the ignored-video issues, so the choice is made once. Null when there is only
+        // one video and there is nothing to choose between.
+        FeatureSelection selection = videos.size() == 1
+                ? null
+                : FeatureSelection.choose(folderName, candidateVideos(videos));
+        String featureName = selection == null
+                ? videos.get(0).getFileName().toString()
+                : selection.feature().filename();
+        String resolution = Resolution.fromFilename(featureName).map(Resolution::display).orElse(null);
+        StagedMovie movie = StagedMovie.from(parsed, folderName, path, raw, resolution);
         Optional<String> alreadyCatalogued = duplicates.claim(movie, path);
         if (alreadyCatalogued.isPresent()) {
             // Same film as a folder already staged this run: skip it, keeping both locations.
@@ -129,7 +140,7 @@ class FilesystemMovieScan implements SourceScan {
             return false;
         }
 
-        recordIgnoredVideos(folder, folderName, parsed, videos, issues);
+        recordIgnoredVideos(folder, folderName, parsed, selection, issues);
 
         staging.stage(movie);
         recordThinFields(folder, movie, issues);
@@ -137,18 +148,20 @@ class FilesystemMovieScan implements SourceScan {
     }
 
     private void recordIgnoredVideos(Path folder, String folderName, ParsedMovie parsed,
-                                     List<Path> videos, List<RunIssue> issues) {
-        if (videos.size() == 1) {
+                                     FeatureSelection selection, List<RunIssue> issues) {
+        if (selection == null) {
             return;
         }
-        List<FeatureSelection.Video> candidates = videos.stream()
-                .map(video -> new FeatureSelection.Video(video.getFileName().toString(), sizeOf(video)))
-                .toList();
-        FeatureSelection selection = FeatureSelection.choose(folderName, candidates);
         String title = DerivedTitle.resolve(parsed.title(), folderName);
         for (FeatureSelection.Video ignored : selection.ignored()) {
             issues.add(RunIssue.ignoredVideo(pathOf(folder.resolve(ignored.filename())), title));
         }
+    }
+
+    private static List<FeatureSelection.Video> candidateVideos(List<Path> videos) {
+        return videos.stream()
+                .map(video -> new FeatureSelection.Video(video.getFileName().toString(), sizeOf(video)))
+                .toList();
     }
 
     private void recordThinFields(Path folder, StagedMovie movie, List<RunIssue> issues) {

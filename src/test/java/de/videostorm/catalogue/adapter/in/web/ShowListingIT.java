@@ -12,6 +12,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -40,8 +42,9 @@ class ShowListingIT extends PostgresIntegrationTestBase {
 
     @BeforeEach
     void clearCatalogue() {
-        // Child first: the show_rating FK forbids deleting a show while any live rating remains.
+        // Children first: the show_rating and episode FKs forbid deleting a show while either remains.
         jdbcTemplate.update("DELETE FROM show_rating");
+        jdbcTemplate.update("DELETE FROM episode");
         jdbcTemplate.update("DELETE FROM show");
     }
 
@@ -59,7 +62,29 @@ class ShowListingIT extends PostgresIntegrationTestBase {
                 .contains("<th>Year</th>")
                 .contains("<th>Status</th>")
                 .contains("<th>Rating</th>")
-                .contains("<th>Genres</th>");
+                .contains("<th>Genres</th>")
+                .contains("<th>Plot</th>");
+    }
+
+    @Test
+    void aShowWithAPlotRendersAPlotLinkCarryingTheUtf8Base64Plot() throws Exception {
+        String plot = "L'été: a \"tale\" of <heroes> & foes.\nSecond line.";
+        insertShowWithPlot("Breaking Bad", plot);
+
+        String html = render("/shows");
+
+        String base64 = Base64.getEncoder().encodeToString(plot.getBytes(StandardCharsets.UTF_8));
+        assertThat(html).contains(
+                "<a class=\"plot-link\" href=\"#\" data-plot=\"" + base64 + "\" data-title=\"Breaking Bad\">Plot</a>");
+    }
+
+    @Test
+    void aShowWithoutAPlotRendersAnEmptyPlotCellWithNoLink() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+
+        String html = render("/shows");
+
+        assertThat(html).doesNotContain("plot-link");
     }
 
     @Test
@@ -311,6 +336,17 @@ class ShowListingIT extends PostgresIntegrationTestBase {
             String title, Integer year, String status, String ratingSource, BigDecimal ratingValue,
             List<String> genreValues) {
         insertShow(title, null, year, status, ratingSource, ratingValue, genreValues);
+    }
+
+    private void insertShowWithPlot(String title, String plot) {
+        String normalizedTitle = TitleNormalizer.normalize(title);
+        String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
+
+        jdbcTemplate.update("""
+                INSERT INTO show (title, year, normalized_title, status, genres, plot, slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                title, 0, normalizedTitle, "UNKNOWN", new GenreList(List.of()).toStorage(), plot, slug);
     }
 
     private void insertShow(

@@ -1,7 +1,6 @@
 package de.videostorm.maintenance.adapter.in.web;
 
 import de.videostorm.indexing.domain.IndexingRun;
-import de.videostorm.sources.domain.SourceType;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
@@ -23,24 +22,24 @@ public class IndexingRunView {
     private static final DateTimeFormatter TIMESTAMP =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC);
 
+    private final long id;
     private final String type;
     private final String status;
     private final String startedAt;
     private final String finishedAt;
     private final int found;
     private final int indexed;
+    private final boolean downloadable;
 
-    static IndexingRunView of(IndexingRun run) {
+    static IndexingRunView of(IndexingRun run, boolean downloadable) {
         return new IndexingRunView(
-                displayType(run.type()),
+                run.id(),
+                run.type().plural(),
                 run.status().name(),
                 TIMESTAMP.format(run.startedAt()),
                 run.finishedAt() == null ? "" : TIMESTAMP.format(run.finishedAt()),
                 run.counts().found(),
-                run.counts().indexed());
-    }
-
-    private static String displayType(SourceType type) {
-        return type == SourceType.MOVIES ? "Movies" : "Shows";
+                run.counts().indexed(),
+                downloadable);
     }
 }

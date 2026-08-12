@@ -9,9 +9,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Promotes staged shows into the live catalogue in one transaction, the show counterpart of
- * {@link JdbcMoviePromotion}. Same swap shape: {@code DELETE} the live rows (child-first) so MVCC
- * readers keep the previous catalogue until commit, then copy the staged rows across with
- * {@code OVERRIDING SYSTEM VALUE} so ids — and the ratings' foreign keys — cross over verbatim.
+ * {@link JdbcMoviePromotion}. Same swap shape: {@code DELETE} the live rows (child-first, so ratings
+ * and episodes go before the shows they reference) so MVCC readers keep the previous catalogue until
+ * commit, then copy the staged rows across with {@code OVERRIDING SYSTEM VALUE} so ids — and the
+ * ratings' and episodes' foreign keys — cross over verbatim.
  */
 @Repository
 class JdbcShowPromotion implements CataloguePromotor {
@@ -32,10 +33,12 @@ class JdbcShowPromotion implements CataloguePromotor {
     @Override
     @Transactional
     public void promote() {
+        jdbc.update("DELETE FROM episode");
         jdbc.update("DELETE FROM show_rating");
         jdbc.update("DELETE FROM show");
         int shows = jdbc.update("INSERT INTO show OVERRIDING SYSTEM VALUE SELECT * FROM show_staging");
         jdbc.update("INSERT INTO show_rating OVERRIDING SYSTEM VALUE SELECT * FROM show_rating_staging");
-        log.info("Promoted {} staged shows into the live catalogue", shows);
+        int episodes = jdbc.update("INSERT INTO episode OVERRIDING SYSTEM VALUE SELECT * FROM episode_staging");
+        log.info("Promoted {} staged shows and {} episodes into the live catalogue", shows, episodes);
     }
 }

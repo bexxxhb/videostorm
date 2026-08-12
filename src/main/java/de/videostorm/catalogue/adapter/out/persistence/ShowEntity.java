@@ -41,4 +41,6 @@ class ShowEntity {
     private BigDecimal ratingValue;
 
     private String genres;
+
+    private String plot;
 }

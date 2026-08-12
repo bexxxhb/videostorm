@@ -171,6 +171,37 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     }
 
     @Test
+    void derivesTheResolutionFromTheFeatureFilenameNormalisedToThePSuffixedForm() {
+        movieFolder("Heat (1995)", "<movie><title>Heat</title><year>1995</year></movie>", "Heat.1080.BluRay.mkv");
+
+        scan.scan(SourceType.MOVIES);
+
+        // The filename carried a bare 1080; it is stored normalised to 1080p.
+        assertThat(jdbc.queryForObject("SELECT resolution FROM movie_staging", String.class)).isEqualTo("1080p");
+    }
+
+    @Test
+    void leavesResolutionNullWhenTheFeatureFilenameHasNoRecognisedToken() {
+        movieFolder("Heat (1995)", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
+
+        scan.scan(SourceType.MOVIES);
+
+        assertThat(jdbc.queryForObject("SELECT resolution FROM movie_staging", String.class)).isNull();
+    }
+
+    @Test
+    void readsTheResolutionFromTheChosenFeatureNotATrailerAlongsideIt() {
+        Path folder = movieFolder("Mad Max Fury Road", "<movie><title>Mad Max</title></movie>",
+                "Mad Max Fury Road.2160p.mkv");
+        write(folder.resolve("trailer.720p.mp4"), "small");
+
+        scan.scan(SourceType.MOVIES);
+
+        // The feature is the 2160p file; the 720p trailer must not supply the resolution.
+        assertThat(jdbc.queryForObject("SELECT resolution FROM movie_staging", String.class)).isEqualTo("2160p");
+    }
+
+    @Test
     void choosesTheFeatureBySharedPrefixAndRecordsTheOthersAsIgnored() {
         Path folder = movieFolder("Mad Max Fury Road", "<movie><title>Mad Max</title></movie>",
                 "Mad Max Fury Road.mkv");

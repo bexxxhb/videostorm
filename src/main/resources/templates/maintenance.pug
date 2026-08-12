@@ -35,8 +35,14 @@ block content
     if !showsConfigured
       p.trigger__note No show source paths are configured; nothing to re-index.
 
+  section.gaps
+    h2 Gaps in the last run
+    ul.gaps__list
+      li.gaps__item Missing title: #{titleGaps}
+      li.gaps__item Missing year: #{yearGaps}
+
   section.history
-    h2 Recent runs
+    h2 Run history
     if hasRuns
       table.history__table
         thead
@@ -47,8 +53,9 @@ block content
             th Finished
             th Found
             th Indexed
+            th Report
         tbody
-          each run in recentRuns
+          each run in runs
             tr
               td= run.type
               td= run.status
@@ -56,5 +63,8 @@ block content
               td= run.finishedAt
               td= run.found
               td= run.indexed
+              td
+                if run.downloadable
+                  a.history__download(href="/maintenance/runs/" + run.id + "/report.csv") Download CSV
     else
       p.history__empty No runs yet.

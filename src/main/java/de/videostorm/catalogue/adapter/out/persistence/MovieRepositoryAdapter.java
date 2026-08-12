@@ -71,6 +71,9 @@ class MovieRepositoryAdapter implements MovieRepository {
                 Year.of(entity.getYear()),
                 rating,
                 GenreList.parse(entity.getGenres()),
-                Optional.ofNullable(entity.getRuntimeMinutes()));
+                Optional.ofNullable(entity.getRuntimeMinutes()),
+                Optional.ofNullable(entity.getResolution()),
+                Optional.ofNullable(entity.getImdbId()),
+                Optional.ofNullable(entity.getPlot()));
     }
 }

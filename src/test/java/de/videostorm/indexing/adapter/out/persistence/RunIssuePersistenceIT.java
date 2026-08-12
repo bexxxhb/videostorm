@@ -4,6 +4,7 @@ import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.indexing.application.port.out.IndexingRunRepository;
 import de.videostorm.indexing.application.port.out.RunIssueRepository;
 import de.videostorm.indexing.domain.IndexingRun;
+import de.videostorm.indexing.domain.RunCounts;
 import de.videostorm.indexing.domain.RunIssue;
 import de.videostorm.sources.domain.SourceType;
 import org.junit.jupiter.api.Test;
@@ -72,5 +73,45 @@ class RunIssuePersistenceIT extends PostgresIntegrationTestBase {
 
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM indexing_run_issue WHERE run_id = ?", Long.class, run.id())).isZero();
+    }
+
+    @Test
+    void readsBackARunsIssueDetailPreservingNulls() {
+        IndexingRun run = runRepository.save(IndexingRun.start(SourceType.MOVIES, T0));
+        runIssues.record(run.id(), List.of(
+                RunIssue.missingField("/media/movies/The Blob", "The Blob", RunIssue.TITLE_FIELD),
+                RunIssue.noVideo("/media/movies/Just Metadata", "Stranded")));
+
+        List<RunIssue> issues = runIssues.findByRun(run.id());
+
+        assertThat(issues).containsExactly(
+                RunIssue.missingField("/media/movies/The Blob", "The Blob", RunIssue.TITLE_FIELD),
+                RunIssue.noVideo("/media/movies/Just Metadata", "Stranded"));
+    }
+
+    @Test
+    void prunesDetailBeyondTheRetainedRunsWhileKeepingTheRunSummaries() {
+        // Three settled runs, oldest first; retain only the two most recent.
+        IndexingRun oldest = completedRun(T0);
+        IndexingRun middle = completedRun(T0.plusSeconds(60));
+        IndexingRun newest = completedRun(T0.plusSeconds(120));
+        runIssues.record(oldest.id(), List.of(RunIssue.noVideo("/media/movies/A", "A")));
+        runIssues.record(middle.id(), List.of(RunIssue.noVideo("/media/movies/B", "B")));
+        runIssues.record(newest.id(), List.of(RunIssue.noVideo("/media/movies/C", "C")));
+
+        runIssues.pruneDetailBeyond(2);
+
+        assertThat(runIssues.findByRun(oldest.id())).isEmpty();
+        assertThat(runIssues.findByRun(middle.id())).hasSize(1);
+        assertThat(runIssues.findByRun(newest.id())).hasSize(1);
+        // Every run summary survives the prune.
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM indexing_run", Long.class)).isEqualTo(3L);
+    }
+
+    // Persists a settled run: only one run may be RUNNING at a time, so each is completed before
+    // the next begins, mirroring the real lifecycle.
+    private IndexingRun completedRun(Instant startedAt) {
+        IndexingRun started = runRepository.save(IndexingRun.start(SourceType.MOVIES, startedAt));
+        return runRepository.save(started.complete(RunCounts.none(), startedAt.plusSeconds(1)));
     }
 }

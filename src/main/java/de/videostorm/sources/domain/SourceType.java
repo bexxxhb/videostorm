@@ -19,4 +19,9 @@ public enum SourceType {
     public String label() {
         return label;
     }
+
+    /** The capitalised plural used as a display heading and in the run report ("Movies", "Shows"). */
+    public String plural() {
+        return this == MOVIES ? "Movies" : "Shows";
+    }
 }

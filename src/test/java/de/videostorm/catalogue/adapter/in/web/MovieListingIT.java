@@ -12,6 +12,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -57,7 +59,59 @@ class MovieListingIT extends PostgresIntegrationTestBase {
                 .contains("<th>Year</th>")
                 .contains("<th>Rating</th>")
                 .contains("<th>Genres</th>")
-                .contains("<th>Runtime</th>");
+                .contains("<th>Runtime</th>")
+                .contains("<th>Resolution</th>")
+                .contains("<th>Plot</th>")
+                .contains("<th>IMDb</th>");
+    }
+
+    @Test
+    void aMovieWithAResolutionRendersItInItsCell() throws Exception {
+        insertMovieWithResolutionAndImdb("Heat", "1080p", null);
+
+        String html = render("/movies");
+
+        assertThat(html).contains("<td>1080p</td>");
+    }
+
+    @Test
+    void aMovieWithAnImdbIdRendersALinkToItsImdbPage() throws Exception {
+        insertMovieWithResolutionAndImdb("Heat", null, "tt0113277");
+
+        String html = render("/movies");
+
+        assertThat(html).contains(
+                "<a class=\"imdb-link\" href=\"https://www.imdb.com/title/tt0113277/\">info @ IMDB.com</a>");
+    }
+
+    @Test
+    void aMovieWithoutAnImdbIdRendersAnEmptyImdbCellWithNoLink() throws Exception {
+        insertMovie("Unscraped Folder", null, null, null, List.of(), null);
+
+        String html = render("/movies");
+
+        assertThat(html).doesNotContain("imdb-link");
+    }
+
+    @Test
+    void aMovieWithAPlotRendersAPlotLinkCarryingTheUtf8Base64Plot() throws Exception {
+        String plot = "L'été: a \"tale\" of <heroes> & foes.\nSecond line.";
+        insertMovieWithPlot("Heat", plot);
+
+        String html = render("/movies");
+
+        String base64 = Base64.getEncoder().encodeToString(plot.getBytes(StandardCharsets.UTF_8));
+        assertThat(html).contains(
+                "<a class=\"plot-link\" href=\"#\" data-plot=\"" + base64 + "\" data-title=\"Heat\">Plot</a>");
+    }
+
+    @Test
+    void aMovieWithoutAPlotRendersAnEmptyPlotCellWithNoLink() throws Exception {
+        insertMovie("Unscraped Folder", null, null, null, List.of(), null);
+
+        String html = render("/movies");
+
+        assertThat(html).doesNotContain("plot-link");
     }
 
     @Test
@@ -307,6 +361,28 @@ class MovieListingIT extends PostgresIntegrationTestBase {
             String title, Integer year, String ratingSource, BigDecimal ratingValue,
             List<String> genreValues, Integer runtimeMinutes) {
         insertMovie(title, null, year, ratingSource, ratingValue, genreValues, runtimeMinutes);
+    }
+
+    private void insertMovieWithResolutionAndImdb(String title, String resolution, String imdbId) {
+        String normalizedTitle = TitleNormalizer.normalize(title);
+        String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
+
+        jdbcTemplate.update("""
+                INSERT INTO movie (title, year, normalized_title, genres, resolution, imdb_id, slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                title, 0, normalizedTitle, new GenreList(List.of()).toStorage(), resolution, imdbId, slug);
+    }
+
+    private void insertMovieWithPlot(String title, String plot) {
+        String normalizedTitle = TitleNormalizer.normalize(title);
+        String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
+
+        jdbcTemplate.update("""
+                INSERT INTO movie (title, year, normalized_title, genres, plot, slug)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                title, 0, normalizedTitle, new GenreList(List.of()).toStorage(), plot, slug);
     }
 
     private void insertMovie(

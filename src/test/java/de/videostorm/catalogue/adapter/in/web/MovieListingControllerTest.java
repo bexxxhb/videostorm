@@ -137,7 +137,9 @@ class MovieListingControllerTest {
                 .contains("<th>Year</th>")
                 .contains("<th>Rating</th>")
                 .contains("<th>Genres</th>")
-                .contains("<th>Runtime</th>");
+                .contains("<th>Runtime</th>")
+                .contains("<th>Resolution</th>")
+                .contains("<th>IMDb</th>");
     }
 
     private String render(String path) throws Exception {

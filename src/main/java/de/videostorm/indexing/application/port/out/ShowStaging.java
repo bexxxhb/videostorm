@@ -1,6 +1,9 @@
 package de.videostorm.indexing.application.port.out;
 
+import de.videostorm.indexing.domain.StagedEpisode;
 import de.videostorm.indexing.domain.StagedShow;
+
+import java.util.List;
 
 /**
  * Writes parsed shows into the staging tables, which mirror the live catalogue but are never read by
@@ -17,4 +20,12 @@ public interface ShowStaging {
      * interruption entry by entry. Returns the id the staged show was given.
      */
     long stage(StagedShow show);
+
+    /**
+     * Writes the episodes discovered under a staged show, against the id {@link #stage} returned. The
+     * episodes are already de-duplicated by the caller, so a collision here would be a bug caught by
+     * the schema backstop rather than an expected condition. A show with no parseable episodes is
+     * staged with none, so this is a no-op for an empty list.
+     */
+    void stageEpisodes(long showId, List<StagedEpisode> episodes);
 }

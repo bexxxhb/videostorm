@@ -9,5 +9,6 @@ public record Show(
         Year year,
         ShowStatus status,
         Optional<Rating> rating,
-        GenreList genres) {
+        GenreList genres,
+        Optional<String> plot) {
 }

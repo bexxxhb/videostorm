@@ -24,7 +24,7 @@ class IndexingOverviewTest {
         IndexingOverview overview = IndexingOverview.from(List.of());
 
         assertThat(overview.activeRun()).isEmpty();
-        assertThat(overview.recentRuns()).isEmpty();
+        assertThat(overview.history()).isEmpty();
     }
 
     @Test
@@ -53,7 +53,7 @@ class IndexingOverviewTest {
 
         IndexingOverview overview = IndexingOverview.from(recent);
 
-        assertThat(overview.recentRuns()).isEqualTo(recent);
+        assertThat(overview.history()).isEqualTo(recent);
     }
 
     private static IndexingRun run(long id, RunStatus status) {

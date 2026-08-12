@@ -11,4 +11,6 @@ interface IndexingRunJpaRepository extends JpaRepository<IndexingRunEntity, Long
     Optional<IndexingRunEntity> findByStatus(String status);
 
     List<IndexingRunEntity> findAllByOrderByStartedAtDesc(Pageable pageable);
+
+    List<IndexingRunEntity> findAllByOrderByStartedAtDesc();
 }

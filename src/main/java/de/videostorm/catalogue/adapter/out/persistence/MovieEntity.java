@@ -42,4 +42,11 @@ class MovieEntity {
 
     @Column(name = "runtime_minutes")
     private Integer runtimeMinutes;
+
+    private String resolution;
+
+    @Column(name = "imdb_id")
+    private String imdbId;
+
+    private String plot;
 }

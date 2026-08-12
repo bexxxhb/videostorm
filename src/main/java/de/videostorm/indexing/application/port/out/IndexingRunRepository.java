@@ -22,4 +22,7 @@ public interface IndexingRunRepository {
 
     /** The most recent runs, newest first, capped at {@code limit}. */
     List<IndexingRun> findRecent(int limit);
+
+    /** Every run, newest first. Summaries are retained indefinitely, so the whole history is returned. */
+    List<IndexingRun> findAll();
 }

@@ -2,12 +2,16 @@ package de.videostorm.indexing.adapter.out.persistence;
 
 import de.videostorm.indexing.application.port.out.ShowStaging;
 import de.videostorm.indexing.domain.ParsedRating;
+import de.videostorm.indexing.domain.StagedEpisode;
 import de.videostorm.indexing.domain.StagedShow;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 /**
  * Writes show staging with {@link NamedParameterJdbcTemplate}: the importer never goes through JPA,
@@ -38,6 +42,11 @@ class JdbcShowStaging implements ShowStaging {
             VALUES (:showId, :source, :value, :max, :votes)
             """;
 
+    private static final String INSERT_EPISODE = """
+            INSERT INTO episode_staging (show_id, season_number, episode_number)
+            VALUES (:showId, :seasonNumber, :episodeNumber)
+            """;
+
     private final NamedParameterJdbcTemplate jdbc;
 
     JdbcShowStaging(NamedParameterJdbcTemplate jdbc) {
@@ -47,8 +56,9 @@ class JdbcShowStaging implements ShowStaging {
     @Override
     @Transactional
     public void clear() {
-        // Child first: the staging FK forbids deleting a show while its ratings remain.
+        // Children first: the staging FKs forbid deleting a show while its ratings or episodes remain.
         jdbc.getJdbcTemplate().update("DELETE FROM show_rating_staging");
+        jdbc.getJdbcTemplate().update("DELETE FROM episode_staging");
         jdbc.getJdbcTemplate().update("DELETE FROM show_staging");
     }
 
@@ -88,5 +98,20 @@ class JdbcShowStaging implements ShowStaging {
                     .addValue("votes", rating.votes()));
         }
         return showId;
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void stageEpisodes(long showId, List<StagedEpisode> episodes) {
+        if (episodes.isEmpty()) {
+            return;
+        }
+        SqlParameterSource[] batch = episodes.stream()
+                .map(episode -> new MapSqlParameterSource()
+                        .addValue("showId", showId)
+                        .addValue("seasonNumber", episode.seasonNumber())
+                        .addValue("episodeNumber", episode.episodeNumber()))
+                .toArray(SqlParameterSource[]::new);
+        jdbc.batchUpdate(INSERT_EPISODE, batch);
     }
 }
