@@ -22,6 +22,7 @@ public class ShowRow {
 
     private static final String EVEN_ROW_CLASS = "row-even";
     private static final String ODD_ROW_CLASS = "row-odd";
+    private static final String IMDB_LINK_TEXT = "info @ IMDB.com";
 
     private final String rowClass;
     private final String title;
@@ -30,6 +31,11 @@ public class ShowRow {
     private final String ratingDisplay;
     private final String genresDisplay;
     private final String genresFullText;
+    private final String seasonsDisplay;
+    private final String episodesDisplay;
+    // Both empty when the show has no imdb id, so the template renders an empty cell (no link, no text).
+    private final String imdbUrl;
+    private final String imdbLinkText;
     // The Plot link renders only when true; the dialog reads the plot from plotBase64 (UTF-8 bytes,
     // base64-encoded) so quotes, angle brackets, accents and newlines survive the attribute round-trip.
     private final boolean hasPlot;
@@ -37,6 +43,7 @@ public class ShowRow {
 
     static ShowRow from(Show show, int index) {
         Optional<String> plot = show.plot().filter(text -> !text.isBlank());
+        Optional<String> imdbId = show.imdbId().filter(id -> !id.isBlank());
         return new ShowRow(
                 index % 2 == 0 ? EVEN_ROW_CLASS : ODD_ROW_CLASS,
                 show.title(),
@@ -45,6 +52,10 @@ public class ShowRow {
                 show.rating().map(Rating::displayLabel).orElse(""),
                 show.genres().displayLabel(),
                 show.genres().fullText(),
+                String.valueOf(show.seasonCount()),
+                String.valueOf(show.episodeCount()),
+                imdbId.map(id -> "https://www.imdb.com/title/" + id + "/").orElse(""),
+                imdbId.isPresent() ? IMDB_LINK_TEXT : "",
                 plot.isPresent(),
                 plot.map(ShowRow::encodeBase64).orElse(""));
     }

@@ -2,18 +2,21 @@ extends layout
 
 block content
   form.search(method="get", action="/shows")
-    input.search__input(type="search", name="q", value=query, placeholder="Search title, genre or year")
+    input.search__input(type="search", name="q", value=query, placeholder="Search title, genre or started")
     button.search__button(type="submit") Search
 
   table.catalogue
     thead
       tr
         th Title
-        th Year
+        th Started
         th Status
         th Rating
         th Genres
+        th Seasons
+        th Total Episodes
         th Plot
+        th IMDb
     tbody
       each show in shows
         tr(class=show.rowClass)
@@ -22,9 +25,14 @@ block content
           td= show.statusDisplay
           td= show.ratingDisplay
           td(title=show.genresFullText)= show.genresDisplay
+          td= show.seasonsDisplay
+          td= show.episodesDisplay
           td
             if show.hasPlot
               a.plot-link(href="#", data-plot=show.plotBase64, data-title=show.title) Plot
+          td
+            if show.imdbUrl
+              a.imdb-link(href=show.imdbUrl)= show.imdbLinkText
 
   nav.pagination
     if pagination.firstPageUrl

@@ -133,10 +133,14 @@ class ShowListingControllerTest {
 
         assertThat(html)
                 .contains("<th>Title</th>")
-                .contains("<th>Year</th>")
+                .contains("<th>Started</th>")
                 .contains("<th>Status</th>")
                 .contains("<th>Rating</th>")
-                .contains("<th>Genres</th>");
+                .contains("<th>Genres</th>")
+                .contains("<th>Seasons</th>")
+                .contains("<th>Total Episodes</th>")
+                .contains("<th>IMDb</th>")
+                .doesNotContain("<th>Year</th>");
     }
 
     private String render(String path) throws Exception {

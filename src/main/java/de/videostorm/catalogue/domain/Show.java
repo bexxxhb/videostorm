@@ -10,5 +10,8 @@ public record Show(
         ShowStatus status,
         Optional<Rating> rating,
         GenreList genres,
-        Optional<String> plot) {
+        Optional<String> plot,
+        int seasonCount,
+        int episodeCount,
+        Optional<String> imdbId) {
 }

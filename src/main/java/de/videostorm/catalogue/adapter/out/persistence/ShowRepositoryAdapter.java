@@ -73,6 +73,9 @@ class ShowRepositoryAdapter implements ShowRepository {
                 ShowStatus.valueOf(entity.getStatus()),
                 rating,
                 GenreList.parse(entity.getGenres()),
-                Optional.ofNullable(entity.getPlot()));
+                Optional.ofNullable(entity.getPlot()),
+                entity.getSeasonCount(),
+                entity.getEpisodeCount(),
+                Optional.ofNullable(entity.getImdbId()));
     }
 }

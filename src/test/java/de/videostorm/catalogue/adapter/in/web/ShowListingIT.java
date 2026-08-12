@@ -59,11 +59,15 @@ class ShowListingIT extends PostgresIntegrationTestBase {
 
         assertThat(html)
                 .contains("<th>Title</th>")
-                .contains("<th>Year</th>")
+                .contains("<th>Started</th>")
                 .contains("<th>Status</th>")
                 .contains("<th>Rating</th>")
                 .contains("<th>Genres</th>")
-                .contains("<th>Plot</th>");
+                .contains("<th>Seasons</th>")
+                .contains("<th>Total Episodes</th>")
+                .contains("<th>Plot</th>")
+                .contains("<th>IMDb</th>")
+                .doesNotContain("<th>Year</th>");
     }
 
     @Test
@@ -107,6 +111,57 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         assertThat(html).contains("<td>ended</td>");
         assertThat(html).contains("<td>9.5 (TVDB)</td>");
         assertThat(html).contains("<td title=\"Crime, Drama\">Crime, Drama</td>");
+    }
+
+    @Test
+    void showsTheDistinctSeasonCountAndTotalEpisodeCount() throws Exception {
+        insertShow("Breaking Bad", 2008, "ENDED", null, null, List.of());
+        long showId = idOf("Breaking Bad");
+        insertEpisode(showId, 1, 1);
+        insertEpisode(showId, 1, 2);
+        insertEpisode(showId, 2, 1);
+
+        String html = render("/shows");
+
+        // Title, Started, Status, Rating(empty), Genres(empty), Seasons(2), Total Episodes(3).
+        assertThat(html).contains(
+                "<td>Breaking Bad</td><td>2008</td><td>ended</td><td></td><td title=\"\"></td><td>2</td><td>3</td>");
+    }
+
+    @Test
+    void aShowWithNoEpisodesRendersZeroSeasonsAndZeroEpisodes() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+
+        String html = render("/shows");
+
+        assertThat(html).contains(
+                "<td>Unscraped Folder</td><td></td><td>unknown</td><td></td><td title=\"\"></td><td>0</td><td>0</td>");
+    }
+
+    @Test
+    void aShowWithAnImdbIdRendersALinkToItsImdbPage() throws Exception {
+        insertShowWithImdb("Breaking Bad", "tt0903747");
+
+        String html = render("/shows");
+
+        assertThat(html).contains(
+                "<a class=\"imdb-link\" href=\"https://www.imdb.com/title/tt0903747/\">info @ IMDB.com</a>");
+    }
+
+    @Test
+    void aShowWithoutAnImdbIdRendersAnEmptyImdbCellWithNoLink() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+
+        String html = render("/shows");
+
+        assertThat(html).doesNotContain("imdb-link");
+    }
+
+    @Test
+    void theMoviesPageKeepsItsYearHeaderUnchanged() throws Exception {
+        String html = render("/movies");
+
+        assertThat(html).contains("<th>Year</th>").doesNotContain("<th>Started</th>");
     }
 
     @Test
@@ -336,6 +391,27 @@ class ShowListingIT extends PostgresIntegrationTestBase {
             String title, Integer year, String status, String ratingSource, BigDecimal ratingValue,
             List<String> genreValues) {
         insertShow(title, null, year, status, ratingSource, ratingValue, genreValues);
+    }
+
+    private long idOf(String title) {
+        return jdbcTemplate.queryForObject("SELECT id FROM show WHERE title = ?", Long.class, title);
+    }
+
+    private void insertEpisode(long showId, int seasonNumber, int episodeNumber) {
+        jdbcTemplate.update(
+                "INSERT INTO episode (show_id, season_number, episode_number) VALUES (?, ?, ?)",
+                showId, seasonNumber, episodeNumber);
+    }
+
+    private void insertShowWithImdb(String title, String imdbId) {
+        String normalizedTitle = TitleNormalizer.normalize(title);
+        String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
+
+        jdbcTemplate.update("""
+                INSERT INTO show (title, year, normalized_title, status, genres, imdb_id, slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                title, 0, normalizedTitle, "UNKNOWN", new GenreList(List.of()).toStorage(), imdbId, slug);
     }
 
     private void insertShowWithPlot(String title, String plot) {

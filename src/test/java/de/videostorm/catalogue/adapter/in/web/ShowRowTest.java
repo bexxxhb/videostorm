@@ -44,13 +44,62 @@ class ShowRowTest {
     @Test
     void aPresentRatingAndStatusAreFormatted() {
         Show show = new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED,
-                Optional.of(new Rating("TVDB", new BigDecimal("9.5"))), GenreList.EMPTY, Optional.empty());
+                Optional.of(new Rating("TVDB", new BigDecimal("9.5"))), GenreList.EMPTY, Optional.empty(),
+                5, 62, Optional.empty());
 
         ShowRow row = ShowRow.from(show, 0);
 
         assertThat(row.getYear()).isEqualTo("2008");
         assertThat(row.getStatusDisplay()).isEqualTo("ended");
         assertThat(row.getRatingDisplay()).isEqualTo("9.5 (TVDB)");
+    }
+
+    @Test
+    void seasonAndEpisodeCountsAreRenderedAsStrings() {
+        Show show = new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(),
+                GenreList.EMPTY, Optional.empty(), 5, 62, Optional.empty());
+
+        ShowRow row = ShowRow.from(show, 0);
+
+        assertThat(row.getSeasonsDisplay()).isEqualTo("5");
+        assertThat(row.getEpisodesDisplay()).isEqualTo("62");
+    }
+
+    @Test
+    void aShowWithNoEpisodesRendersZeroSeasonsAndZeroEpisodes() {
+        ShowRow row = ShowRow.from(minimalShow(), 0);
+
+        assertThat(row.getSeasonsDisplay()).isEqualTo("0");
+        assertThat(row.getEpisodesDisplay()).isEqualTo("0");
+    }
+
+    @Test
+    void anAbsentImdbIdLeavesBothTheUrlAndLinkTextEmpty() {
+        ShowRow row = ShowRow.from(minimalShow(), 0);
+
+        assertThat(row.getImdbUrl()).isEmpty();
+        assertThat(row.getImdbLinkText()).isEmpty();
+    }
+
+    @Test
+    void aBlankImdbIdIsTreatedAsAbsent() {
+        ShowRow row = ShowRow.from(showWithImdbId("   "), 0);
+
+        assertThat(row.getImdbUrl()).isEmpty();
+        assertThat(row.getImdbLinkText()).isEmpty();
+    }
+
+    @Test
+    void aPresentImdbIdBuildsTheTitleUrlAndTheFixedLinkText() {
+        ShowRow row = ShowRow.from(showWithImdbId("tt0903747"), 0);
+
+        assertThat(row.getImdbUrl()).isEqualTo("https://www.imdb.com/title/tt0903747/");
+        assertThat(row.getImdbLinkText()).isEqualTo("info @ IMDB.com");
+    }
+
+    private static Show showWithImdbId(String imdbId) {
+        return new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(), GenreList.EMPTY,
+                Optional.empty(), 5, 62, Optional.of(imdbId));
     }
 
     @Test
@@ -81,7 +130,7 @@ class ShowRowTest {
 
     private static Show showWithPlot(String plot) {
         return new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(), GenreList.EMPTY,
-                Optional.of(plot));
+                Optional.of(plot), 5, 62, Optional.empty());
     }
 
     private static String decode(String base64) {
@@ -90,6 +139,6 @@ class ShowRowTest {
 
     private static Show minimalShow() {
         return new Show(1, "Unscraped Folder", Year.UNKNOWN, ShowStatus.UNKNOWN, Optional.empty(), GenreList.EMPTY,
-                Optional.empty());
+                Optional.empty(), 0, 0, Optional.empty());
     }
 }

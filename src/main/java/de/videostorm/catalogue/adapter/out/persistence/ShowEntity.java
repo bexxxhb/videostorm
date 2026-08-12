@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Formula;
 
 import java.math.BigDecimal;
 
@@ -43,4 +44,16 @@ class ShowEntity {
     private String genres;
 
     private String plot;
+
+    @Column(name = "imdb_id")
+    private String imdbId;
+
+    // Read-side aggregates over the episode table (issue #27); episodes have no JPA entity of their own,
+    // so they are derived here as correlated subqueries. A show with no episode rows yields 0/0, which the
+    // listing renders verbatim. Hibernate qualifies the unaliased `id` with this entity's table alias.
+    @Formula("(SELECT COUNT(DISTINCT e.season_number) FROM episode e WHERE e.show_id = id)")
+    private int seasonCount;
+
+    @Formula("(SELECT COUNT(*) FROM episode e WHERE e.show_id = id)")
+    private int episodeCount;
 }
