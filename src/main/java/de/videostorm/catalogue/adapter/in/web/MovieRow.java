@@ -22,6 +22,7 @@ public class MovieRow {
 
     private static final String EVEN_ROW_CLASS = "row-even";
     private static final String ODD_ROW_CLASS = "row-odd";
+    private static final String IMDB_LINK_TEXT = "info @ IMDB.com";
 
     private final String rowClass;
     private final String title;
@@ -30,6 +31,11 @@ public class MovieRow {
     private final String genresDisplay;
     private final String genresFullText;
     private final String runtimeDisplay;
+    // Empty when the feature filename carried no recognised resolution token; always p-suffixed otherwise.
+    private final String resolutionDisplay;
+    // Both empty when the film has no imdb id, so the template renders an empty cell (no link, no text).
+    private final String imdbUrl;
+    private final String imdbLinkText;
     // The Plot link renders only when true; the dialog reads the plot from plotBase64 (UTF-8 bytes,
     // base64-encoded) so quotes, angle brackets, accents and newlines survive the attribute round-trip.
     private final boolean hasPlot;
@@ -37,6 +43,7 @@ public class MovieRow {
 
     static MovieRow from(Movie movie, int index) {
         Optional<String> plot = movie.plot().filter(text -> !text.isBlank());
+        Optional<String> imdbId = movie.imdbId().filter(id -> !id.isBlank());
         return new MovieRow(
                 index % 2 == 0 ? EVEN_ROW_CLASS : ODD_ROW_CLASS,
                 movie.title(),
@@ -45,6 +52,9 @@ public class MovieRow {
                 movie.genres().displayLabel(),
                 movie.genres().fullText(),
                 movie.runtimeMinutes().map(String::valueOf).orElse(""),
+                movie.resolution().orElse(""),
+                imdbId.map(id -> "https://www.imdb.com/title/" + id + "/").orElse(""),
+                imdbId.isPresent() ? IMDB_LINK_TEXT : "",
                 plot.isPresent(),
                 plot.map(MovieRow::encodeBase64).orElse(""));
     }

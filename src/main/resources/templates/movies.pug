@@ -13,7 +13,9 @@ block content
         th Rating
         th Genres
         th Runtime
+        th Resolution
         th Plot
+        th IMDb
     tbody
       each movie in movies
         tr(class=movie.rowClass)
@@ -22,9 +24,13 @@ block content
           td= movie.ratingDisplay
           td(title=movie.genresFullText)= movie.genresDisplay
           td= movie.runtimeDisplay
+          td= movie.resolutionDisplay
           td
             if movie.hasPlot
               a.plot-link(href="#", data-plot=movie.plotBase64, data-title=movie.title) Plot
+          td
+            if movie.imdbUrl
+              a.imdb-link(href=movie.imdbUrl)= movie.imdbLinkText
 
   nav.pagination
     if pagination.firstPageUrl

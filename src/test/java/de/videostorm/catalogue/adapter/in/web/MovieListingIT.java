@@ -60,7 +60,37 @@ class MovieListingIT extends PostgresIntegrationTestBase {
                 .contains("<th>Rating</th>")
                 .contains("<th>Genres</th>")
                 .contains("<th>Runtime</th>")
-                .contains("<th>Plot</th>");
+                .contains("<th>Resolution</th>")
+                .contains("<th>Plot</th>")
+                .contains("<th>IMDb</th>");
+    }
+
+    @Test
+    void aMovieWithAResolutionRendersItInItsCell() throws Exception {
+        insertMovieWithResolutionAndImdb("Heat", "1080p", null);
+
+        String html = render("/movies");
+
+        assertThat(html).contains("<td>1080p</td>");
+    }
+
+    @Test
+    void aMovieWithAnImdbIdRendersALinkToItsImdbPage() throws Exception {
+        insertMovieWithResolutionAndImdb("Heat", null, "tt0113277");
+
+        String html = render("/movies");
+
+        assertThat(html).contains(
+                "<a class=\"imdb-link\" href=\"https://www.imdb.com/title/tt0113277/\">info @ IMDB.com</a>");
+    }
+
+    @Test
+    void aMovieWithoutAnImdbIdRendersAnEmptyImdbCellWithNoLink() throws Exception {
+        insertMovie("Unscraped Folder", null, null, null, List.of(), null);
+
+        String html = render("/movies");
+
+        assertThat(html).doesNotContain("imdb-link");
     }
 
     @Test
@@ -331,6 +361,17 @@ class MovieListingIT extends PostgresIntegrationTestBase {
             String title, Integer year, String ratingSource, BigDecimal ratingValue,
             List<String> genreValues, Integer runtimeMinutes) {
         insertMovie(title, null, year, ratingSource, ratingValue, genreValues, runtimeMinutes);
+    }
+
+    private void insertMovieWithResolutionAndImdb(String title, String resolution, String imdbId) {
+        String normalizedTitle = TitleNormalizer.normalize(title);
+        String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
+
+        jdbcTemplate.update("""
+                INSERT INTO movie (title, year, normalized_title, genres, resolution, imdb_id, slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                title, 0, normalizedTitle, new GenreList(List.of()).toStorage(), resolution, imdbId, slug);
     }
 
     private void insertMovieWithPlot(String title, String plot) {

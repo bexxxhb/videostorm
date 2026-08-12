@@ -26,11 +26,13 @@ class StagedMovieTest {
                 parsed(2014, List.of(), List.of("Action", "Thriller")),
                 "Taken 3 (2014)",
                 "/media/movies/Taken 3 (2014)",
-                "<movie/>");
+                "<movie/>",
+                "1080p");
 
         assertThat(staged.title()).isEqualTo("96 Hours - Taken 3");
         assertThat(staged.derivedTitle()).isFalse();
         assertThat(staged.year()).isEqualTo(2014);
+        assertThat(staged.resolution()).isEqualTo("1080p");
         assertThat(staged.normalizedTitle()).isEqualTo("96 hours taken 3");
         assertThat(staged.normalizedOriginalTitle()).isEqualTo("taken 3");
         assertThat(staged.slug()).isEqualTo("96-hours-taken-3-2014");
@@ -41,7 +43,7 @@ class StagedMovieTest {
 
     @Test
     void foldsAMissingYearToZeroAndAnEmptyGenreListToNoColumn() {
-        StagedMovie staged = StagedMovie.from(parsed(null, List.of(), List.of()), "Taken 3", "/p", "x");
+        StagedMovie staged = StagedMovie.from(parsed(null, List.of(), List.of()), "Taken 3", "/p", "x", null);
 
         assertThat(staged.year()).isZero();
         assertThat(staged.slug()).isEqualTo("96-hours-taken-3-0");
@@ -54,7 +56,7 @@ class StagedMovieTest {
         ParsedMovie noTitle = new ParsedMovie(null, null, null, List.of(), List.of(),
                 null, null, null, null, null, null, null);
 
-        StagedMovie staged = StagedMovie.from(noTitle, "The Blob (1958).mkv", "/p", "x");
+        StagedMovie staged = StagedMovie.from(noTitle, "The Blob (1958).mkv", "/p", "x", null);
 
         assertThat(staged.title()).isEqualTo("The Blob (1958)");
         assertThat(staged.derivedTitle()).isTrue();
@@ -66,7 +68,7 @@ class StagedMovieTest {
 
     @Test
     void derivesTheIdentityTitleFromTheOriginalTitleWherePresent() {
-        StagedMovie staged = StagedMovie.from(parsed(2014, List.of(), List.of()), "Taken 3", "/p", "x");
+        StagedMovie staged = StagedMovie.from(parsed(2014, List.of(), List.of()), "Taken 3", "/p", "x", null);
 
         // Original title "Taken 3" wins over the display title "96 Hours - Taken 3".
         assertThat(staged.normalizedIdentityTitle()).isEqualTo("taken 3");
@@ -77,7 +79,7 @@ class StagedMovieTest {
         ParsedMovie noOriginal = new ParsedMovie("The Thing", null, 1982, List.of(), List.of(),
                 null, null, null, null, null, null, null);
 
-        StagedMovie staged = StagedMovie.from(noOriginal, "The Thing (1982)", "/p", "x");
+        StagedMovie staged = StagedMovie.from(noOriginal, "The Thing (1982)", "/p", "x", null);
 
         assertThat(staged.normalizedIdentityTitle()).isEqualTo("the thing");
     }
@@ -87,7 +89,7 @@ class StagedMovieTest {
         ParsedMovie nothing = new ParsedMovie(null, null, null, List.of(), List.of(),
                 null, null, null, null, null, null, null);
 
-        StagedMovie staged = StagedMovie.from(nothing, "The Blob (1958).mkv", "/p", "x");
+        StagedMovie staged = StagedMovie.from(nothing, "The Blob (1958).mkv", "/p", "x", null);
 
         assertThat(staged.normalizedIdentityTitle()).isEqualTo("the blob 1958");
     }
@@ -97,7 +99,7 @@ class StagedMovieTest {
         ParsedRating tmdb = new ParsedRating("themoviedb", new BigDecimal("6.3"), new BigDecimal("10"), 4200, true);
         ParsedRating imdb = new ParsedRating("imdb", new BigDecimal("6.0"), new BigDecimal("10"), 250000, false);
 
-        StagedMovie staged = StagedMovie.from(parsed(2014, List.of(imdb, tmdb), List.of()), "Taken 3", "/p", "x");
+        StagedMovie staged = StagedMovie.from(parsed(2014, List.of(imdb, tmdb), List.of()), "Taken 3", "/p", "x", null);
 
         assertThat(staged.defaultRating()).isEqualTo(tmdb);
         assertThat(staged.ratings()).containsExactly(imdb, tmdb);
@@ -108,14 +110,14 @@ class StagedMovieTest {
         ParsedRating first = new ParsedRating("imdb", new BigDecimal("6.0"), new BigDecimal("10"), 10, false);
         ParsedRating second = new ParsedRating("themoviedb", new BigDecimal("6.3"), new BigDecimal("10"), 20, false);
 
-        StagedMovie staged = StagedMovie.from(parsed(2014, List.of(first, second), List.of()), "Taken 3", "/p", "x");
+        StagedMovie staged = StagedMovie.from(parsed(2014, List.of(first, second), List.of()), "Taken 3", "/p", "x", null);
 
         assertThat(staged.defaultRating()).isEqualTo(first);
     }
 
     @Test
     void hasNoInlineRatingWhenTheFilmIsUnrated() {
-        StagedMovie staged = StagedMovie.from(parsed(2014, List.of(), List.of()), "Taken 3", "/p", "x");
+        StagedMovie staged = StagedMovie.from(parsed(2014, List.of(), List.of()), "Taken 3", "/p", "x", null);
 
         assertThat(staged.defaultRating()).isNull();
         assertThat(staged.ratings()).isEmpty();

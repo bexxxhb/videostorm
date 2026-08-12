@@ -44,13 +44,59 @@ class MovieRowTest {
     void aPresentRatingIsFormattedWithItsProvider() {
         Movie movie = new Movie(1, "Heat", Year.of(1995),
                 Optional.of(new Rating("TMDB", new BigDecimal("7.8"))), GenreList.EMPTY, Optional.of(170),
-                Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty());
 
         MovieRow row = MovieRow.from(movie, 0);
 
         assertThat(row.getYear()).isEqualTo("1995");
         assertThat(row.getRatingDisplay()).isEqualTo("7.8 (TMDB)");
         assertThat(row.getRuntimeDisplay()).isEqualTo("170");
+    }
+
+    @Test
+    void anAbsentResolutionRendersAsAnEmptyString() {
+        assertThat(MovieRow.from(minimalMovie(), 0).getResolutionDisplay()).isEmpty();
+    }
+
+    @Test
+    void aPresentResolutionIsRenderedAsIsFromTheDomain() {
+        Movie movie = movieWithResolution("1080p");
+
+        assertThat(MovieRow.from(movie, 0).getResolutionDisplay()).isEqualTo("1080p");
+    }
+
+    @Test
+    void anAbsentImdbIdLeavesBothTheUrlAndLinkTextEmpty() {
+        MovieRow row = MovieRow.from(minimalMovie(), 0);
+
+        assertThat(row.getImdbUrl()).isEmpty();
+        assertThat(row.getImdbLinkText()).isEmpty();
+    }
+
+    @Test
+    void aBlankImdbIdIsTreatedAsAbsent() {
+        MovieRow row = MovieRow.from(movieWithImdbId("   "), 0);
+
+        assertThat(row.getImdbUrl()).isEmpty();
+        assertThat(row.getImdbLinkText()).isEmpty();
+    }
+
+    @Test
+    void aPresentImdbIdBuildsTheTitleUrlAndTheFixedLinkText() {
+        MovieRow row = MovieRow.from(movieWithImdbId("tt0113277"), 0);
+
+        assertThat(row.getImdbUrl()).isEqualTo("https://www.imdb.com/title/tt0113277/");
+        assertThat(row.getImdbLinkText()).isEqualTo("info @ IMDB.com");
+    }
+
+    private static Movie movieWithResolution(String resolution) {
+        return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
+                Optional.of(resolution), Optional.empty(), Optional.empty());
+    }
+
+    private static Movie movieWithImdbId(String imdbId) {
+        return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
+                Optional.empty(), Optional.of(imdbId), Optional.empty());
     }
 
     @Test
@@ -81,7 +127,7 @@ class MovieRowTest {
 
     private static Movie movieWithPlot(String plot) {
         return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.of(plot));
+                Optional.empty(), Optional.empty(), Optional.of(plot));
     }
 
     private static String decode(String base64) {
@@ -90,6 +136,6 @@ class MovieRowTest {
 
     private static Movie minimalMovie() {
         return new Movie(1, "Unscraped Folder", Year.UNKNOWN, Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty());
     }
 }

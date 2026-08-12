@@ -10,5 +10,7 @@ public record Movie(
         Optional<Rating> rating,
         GenreList genres,
         Optional<Integer> runtimeMinutes,
+        Optional<String> resolution,
+        Optional<String> imdbId,
         Optional<String> plot) {
 }

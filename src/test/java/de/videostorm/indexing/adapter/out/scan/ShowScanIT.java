@@ -55,6 +55,13 @@ class ShowScanIT extends PostgresIntegrationTestBase {
         jdbc.update("DELETE FROM show_rating");
         jdbc.update("DELETE FROM episode");
         jdbc.update("DELETE FROM show");
+        // The movie side is cleared too, symmetric to MovieScanIT: this class asserts a show scan
+        // leaves the movie catalogue and its staging untouched, so both must start empty regardless of
+        // what a movie IT staged before it.
+        jdbc.update("DELETE FROM movie_rating_staging");
+        jdbc.update("DELETE FROM movie_staging");
+        jdbc.update("DELETE FROM movie_rating");
+        jdbc.update("DELETE FROM movie");
         emptyLibrary();
     }
 

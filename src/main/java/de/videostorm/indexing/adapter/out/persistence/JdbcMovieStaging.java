@@ -21,13 +21,13 @@ class JdbcMovieStaging implements MovieStaging {
             INSERT INTO movie_staging (
                 title, original_title, year, normalized_title, normalized_original_title,
                 rating_source, rating_value, rating_max, rating_votes,
-                genres, runtime_minutes, plot, set_name, collection_id,
+                genres, runtime_minutes, resolution, plot, set_name, collection_id,
                 imdb_id, tvdb_id, tmdb_id, raw_nfo, slug, source_path,
                 derived_title, derived_year)
             VALUES (
                 :title, :originalTitle, :year, :normalizedTitle, :normalizedOriginalTitle,
                 :ratingSource, :ratingValue, :ratingMax, :ratingVotes,
-                :genres, :runtimeMinutes, :plot, :setName, :collectionId,
+                :genres, :runtimeMinutes, :resolution, :plot, :setName, :collectionId,
                 :imdbId, :tvdbId, :tmdbId, :rawNfo, :slug, :sourcePath,
                 :derivedTitle, FALSE)
             RETURNING id
@@ -69,6 +69,7 @@ class JdbcMovieStaging implements MovieStaging {
                 .addValue("ratingVotes", inline == null ? null : inline.votes())
                 .addValue("genres", movie.genresStorage())
                 .addValue("runtimeMinutes", movie.runtimeMinutes())
+                .addValue("resolution", movie.resolution())
                 .addValue("plot", movie.plot())
                 .addValue("setName", movie.setName())
                 .addValue("collectionId", movie.collectionId())

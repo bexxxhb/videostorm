@@ -43,7 +43,7 @@ class MovieStagingIT extends PostgresIntegrationTestBase {
         ParsedMovie parsed = new ParsedMovie("96 Hours - Taken 3", "Taken 3", 2014,
                 List.of(tmdb, imdb), List.of("Action", "Thriller"), 109, "A plot.",
                 "Taken Collection", "133352", "tt2446042", null, "260346");
-        return StagedMovie.from(parsed, "Taken 3 (2014)", "/media/movies/Taken 3 (2014)", "<movie>raw</movie>");
+        return StagedMovie.from(parsed, "Taken 3 (2014)", "/media/movies/Taken 3 (2014)", "<movie>raw</movie>", "1080p");
     }
 
     @Test
@@ -58,6 +58,7 @@ class MovieStagingIT extends PostgresIntegrationTestBase {
         assertThat(row.get("normalized_original_title")).isEqualTo("taken 3");
         assertThat(row.get("genres")).isEqualTo("|Action|Thriller|");
         assertThat(row.get("runtime_minutes")).isEqualTo(109);
+        assertThat(row.get("resolution")).isEqualTo("1080p");
         assertThat(row.get("plot")).isEqualTo("A plot.");
         assertThat(row.get("set_name")).isEqualTo("Taken Collection");
         assertThat(row.get("collection_id")).isEqualTo("133352");
