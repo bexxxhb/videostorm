@@ -45,6 +45,15 @@ class IndexingRunPersistenceIT extends PostgresIntegrationTestBase {
     }
 
     @Test
+    void persistsAndReadsBackTheSkippedCountAlongsideFoundAndIndexed() {
+        repository.save(IndexingRun.start(SourceType.MOVIES, T0).complete(new RunCounts(5, 3, 2), T0.plusSeconds(30)));
+
+        IndexingRun stored = repository.findRecent(1).get(0);
+
+        assertThat(stored.counts()).isEqualTo(new RunCounts(5, 3, 2));
+    }
+
+    @Test
     void listsRecentRunsNewestFirstAndCappedAtTheLimit() {
         for (int i = 0; i < 12; i++) {
             repository.save(IndexingRun.start(SourceType.MOVIES, T0.plusSeconds(i))

@@ -54,6 +54,7 @@ class IndexingRunRepositoryAdapter implements IndexingRunRepository {
         entity.setFinishedAt(run.finishedAt());
         entity.setEntriesFound(run.counts().found());
         entity.setEntriesIndexed(run.counts().indexed());
+        entity.setEntriesSkipped(run.counts().skipped());
         return entity;
     }
 
@@ -64,6 +65,6 @@ class IndexingRunRepositoryAdapter implements IndexingRunRepository {
                 RunStatus.valueOf(entity.getStatus()),
                 entity.getStartedAt(),
                 entity.getFinishedAt(),
-                new RunCounts(entity.getEntriesFound(), entity.getEntriesIndexed()));
+                new RunCounts(entity.getEntriesFound(), entity.getEntriesIndexed(), entity.getEntriesSkipped()));
     }
 }

@@ -83,6 +83,8 @@ class IndexingRunIT extends PostgresIntegrationTestBase {
         assertThat(html).contains("Movies");
         assertThat(html).doesNotContain("RUNNING");
         assertThat(countOccurrences(html, "COMPLETED")).isEqualTo(1);
+        // The run history carries the Skipped column introduced with size-based movie detection.
+        assertThat(html).contains("<th>Skipped</th>");
     }
 
     @Test
