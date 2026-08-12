@@ -8,6 +8,8 @@ import de.videostorm.catalogue.domain.Year;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,7 +44,7 @@ class ShowRowTest {
     @Test
     void aPresentRatingAndStatusAreFormatted() {
         Show show = new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED,
-                Optional.of(new Rating("TVDB", new BigDecimal("9.5"))), GenreList.EMPTY);
+                Optional.of(new Rating("TVDB", new BigDecimal("9.5"))), GenreList.EMPTY, Optional.empty());
 
         ShowRow row = ShowRow.from(show, 0);
 
@@ -51,7 +53,43 @@ class ShowRowTest {
         assertThat(row.getRatingDisplay()).isEqualTo("9.5 (TVDB)");
     }
 
+    @Test
+    void anAbsentPlotHasNoLinkAndAnEmptyBase64() {
+        ShowRow row = ShowRow.from(minimalShow(), 0);
+
+        assertThat(row.isHasPlot()).isFalse();
+        assertThat(row.getPlotBase64()).isEmpty();
+    }
+
+    @Test
+    void aBlankPlotIsTreatedAsAbsent() {
+        ShowRow row = ShowRow.from(showWithPlot("   "), 0);
+
+        assertThat(row.isHasPlot()).isFalse();
+        assertThat(row.getPlotBase64()).isEmpty();
+    }
+
+    @Test
+    void aPresentPlotIsExposedAsUtf8Base64() {
+        String plot = "L'été: a \"tale\" of <heroes> & foes.\nSecond line.";
+
+        ShowRow row = ShowRow.from(showWithPlot(plot), 0);
+
+        assertThat(row.isHasPlot()).isTrue();
+        assertThat(decode(row.getPlotBase64())).isEqualTo(plot);
+    }
+
+    private static Show showWithPlot(String plot) {
+        return new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(), GenreList.EMPTY,
+                Optional.of(plot));
+    }
+
+    private static String decode(String base64) {
+        return new String(Base64.getDecoder().decode(base64), StandardCharsets.UTF_8);
+    }
+
     private static Show minimalShow() {
-        return new Show(1, "Unscraped Folder", Year.UNKNOWN, ShowStatus.UNKNOWN, Optional.empty(), GenreList.EMPTY);
+        return new Show(1, "Unscraped Folder", Year.UNKNOWN, ShowStatus.UNKNOWN, Optional.empty(), GenreList.EMPTY,
+                Optional.empty());
     }
 }

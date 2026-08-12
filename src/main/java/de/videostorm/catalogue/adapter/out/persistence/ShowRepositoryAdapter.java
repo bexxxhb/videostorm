@@ -72,6 +72,7 @@ class ShowRepositoryAdapter implements ShowRepository {
                 Year.of(entity.getYear()),
                 ShowStatus.valueOf(entity.getStatus()),
                 rating,
-                GenreList.parse(entity.getGenres()));
+                GenreList.parse(entity.getGenres()),
+                Optional.ofNullable(entity.getPlot()));
     }
 }

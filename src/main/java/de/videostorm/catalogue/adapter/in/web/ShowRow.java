@@ -5,6 +5,10 @@ import de.videostorm.catalogue.domain.Show;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.Optional;
+
 /**
  * The template is kept dumb: every string here is already display-ready, including the zebra
  * row class, so Pug never has to evaluate arithmetic or ternaries.
@@ -26,8 +30,13 @@ public class ShowRow {
     private final String ratingDisplay;
     private final String genresDisplay;
     private final String genresFullText;
+    // The Plot link renders only when true; the dialog reads the plot from plotBase64 (UTF-8 bytes,
+    // base64-encoded) so quotes, angle brackets, accents and newlines survive the attribute round-trip.
+    private final boolean hasPlot;
+    private final String plotBase64;
 
     static ShowRow from(Show show, int index) {
+        Optional<String> plot = show.plot().filter(text -> !text.isBlank());
         return new ShowRow(
                 index % 2 == 0 ? EVEN_ROW_CLASS : ODD_ROW_CLASS,
                 show.title(),
@@ -35,6 +44,12 @@ public class ShowRow {
                 show.status().displayLabel(),
                 show.rating().map(Rating::displayLabel).orElse(""),
                 show.genres().displayLabel(),
-                show.genres().fullText());
+                show.genres().fullText(),
+                plot.isPresent(),
+                plot.map(ShowRow::encodeBase64).orElse(""));
+    }
+
+    private static String encodeBase64(String plot) {
+        return Base64.getEncoder().encodeToString(plot.getBytes(StandardCharsets.UTF_8));
     }
 }

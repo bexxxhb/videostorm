@@ -13,6 +13,7 @@ block content
         th Status
         th Rating
         th Genres
+        th Plot
     tbody
       each show in shows
         tr(class=show.rowClass)
@@ -21,6 +22,9 @@ block content
           td= show.statusDisplay
           td= show.ratingDisplay
           td(title=show.genresFullText)= show.genresDisplay
+          td
+            if show.hasPlot
+              a.plot-link(href="#", data-plot=show.plotBase64, data-title=show.title) Plot
 
   nav.pagination
     if pagination.firstPageUrl

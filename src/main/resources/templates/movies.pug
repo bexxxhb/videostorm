@@ -13,6 +13,7 @@ block content
         th Rating
         th Genres
         th Runtime
+        th Plot
     tbody
       each movie in movies
         tr(class=movie.rowClass)
@@ -21,6 +22,9 @@ block content
           td= movie.ratingDisplay
           td(title=movie.genresFullText)= movie.genresDisplay
           td= movie.runtimeDisplay
+          td
+            if movie.hasPlot
+              a.plot-link(href="#", data-plot=movie.plotBase64, data-title=movie.title) Plot
 
   nav.pagination
     if pagination.firstPageUrl

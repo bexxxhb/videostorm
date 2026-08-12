@@ -42,4 +42,6 @@ class MovieEntity {
 
     @Column(name = "runtime_minutes")
     private Integer runtimeMinutes;
+
+    private String plot;
 }

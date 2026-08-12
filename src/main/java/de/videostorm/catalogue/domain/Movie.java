@@ -9,5 +9,6 @@ public record Movie(
         Year year,
         Optional<Rating> rating,
         GenreList genres,
-        Optional<Integer> runtimeMinutes) {
+        Optional<Integer> runtimeMinutes,
+        Optional<String> plot) {
 }
