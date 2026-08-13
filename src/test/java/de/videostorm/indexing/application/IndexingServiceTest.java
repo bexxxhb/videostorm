@@ -107,6 +107,20 @@ class IndexingServiceTest {
     }
 
     @Test
+    void aSuccessfulRunPersistsTheDistinctMissingDataCountFromItsIssues() {
+        scan.report = new ScanReport(new RunCounts(2, 2), List.of(
+                RunIssue.missingField("/media/movies/Blob", "The Blob", RunIssue.TITLE_FIELD),
+                RunIssue.missingField("/media/movies/Blob", "The Blob", RunIssue.YEAR_FIELD),
+                RunIssue.missingField("/media/movies/Heat", "Heat", RunIssue.YEAR_FIELD)));
+        service.trigger(SourceType.MOVIES);
+
+        executor.runAll();
+
+        // Blob is thin in both fields but counts once, so two distinct entries have missing data.
+        assertThat(repository.all.get(0).counts().missingData()).isEqualTo(2);
+    }
+
+    @Test
     void aFailedScanRecordsNoIssues() {
         scan.failure = new IllegalStateException("boom");
         service.trigger(SourceType.MOVIES);
