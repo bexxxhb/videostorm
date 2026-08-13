@@ -44,7 +44,7 @@ class MovieRowTest {
     void aPresentRatingIsFormattedWithItsProvider() {
         Movie movie = new Movie(1, "Heat", Year.of(1995),
                 Optional.of(new Rating("TMDB", new BigDecimal("7.8"))), GenreList.EMPTY, Optional.of(170),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), false);
 
         MovieRow row = MovieRow.from(movie, 0);
 
@@ -91,12 +91,12 @@ class MovieRowTest {
 
     private static Movie movieWithResolution(String resolution) {
         return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.of(resolution), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.of(resolution), Optional.empty(), Optional.empty(), false);
     }
 
     private static Movie movieWithImdbId(String imdbId) {
         return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.empty(), Optional.of(imdbId), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.of(imdbId), Optional.empty(), false);
     }
 
     @Test
@@ -127,38 +127,28 @@ class MovieRowTest {
 
     private static Movie movieWithPlot(String plot) {
         return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(plot), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.of(plot), false);
     }
 
     @Test
-    void anAbsentRawNfoHasNoLinkAndAnEmptyBase64() {
+    void aMovieWithoutRawNfoHasNoLinkAndAnEmptyUrl() {
         MovieRow row = MovieRow.from(minimalMovie(), 0);
 
         assertThat(row.isHasRawNfo()).isFalse();
-        assertThat(row.getRawNfoBase64()).isEmpty();
+        assertThat(row.getRawNfoUrl()).isEmpty();
     }
 
     @Test
-    void aBlankRawNfoIsTreatedAsAbsent() {
-        MovieRow row = MovieRow.from(movieWithRawNfo("   "), 0);
-
-        assertThat(row.isHasRawNfo()).isFalse();
-        assertThat(row.getRawNfoBase64()).isEmpty();
-    }
-
-    @Test
-    void aPresentRawNfoIsExposedAsUtf8Base64() {
-        String rawNfo = "<movie>\n  <title>Heat</title>\n  <plot>L'été & \"foes\"</plot>\n</movie>";
-
-        MovieRow row = MovieRow.from(movieWithRawNfo(rawNfo), 0);
+    void aMovieWithRawNfoLinksToItsOnDemandNfoEndpoint() {
+        MovieRow row = MovieRow.from(movieWithRawNfo(), 0);
 
         assertThat(row.isHasRawNfo()).isTrue();
-        assertThat(decode(row.getRawNfoBase64())).isEqualTo(rawNfo);
+        assertThat(row.getRawNfoUrl()).isEqualTo("/movies/1/nfo");
     }
 
-    private static Movie movieWithRawNfo(String rawNfo) {
+    private static Movie movieWithRawNfo() {
         return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(rawNfo));
+                Optional.empty(), Optional.empty(), Optional.empty(), true);
     }
 
     private static String decode(String base64) {
@@ -167,6 +157,6 @@ class MovieRowTest {
 
     private static Movie minimalMovie() {
         return new Movie(1, "Unscraped Folder", Year.UNKNOWN, Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
+                Optional.empty(), Optional.empty(), Optional.empty(), false);
     }
 }

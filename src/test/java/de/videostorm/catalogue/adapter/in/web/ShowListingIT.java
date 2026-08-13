@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -93,16 +94,13 @@ class ShowListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void aShowWithRawNfoRendersARawDataLinkCarryingTheUtf8Base64Xml() throws Exception {
-        String rawNfo = "<tvshow>\n  <title>Breaking Bad</title>\n  <plot>L'été & \"foes\"</plot>\n</tvshow>";
-        insertShowWithRawNfo("Breaking Bad", rawNfo);
+    void aShowWithRawNfoRendersARawDataLinkToItsOnDemandNfoEndpoint() throws Exception {
+        long id = insertShowWithRawNfo("Breaking Bad", "<tvshow><title>Breaking Bad</title></tvshow>");
 
         String html = render("/shows");
 
-        String base64 = Base64.getEncoder().encodeToString(rawNfo.getBytes(StandardCharsets.UTF_8));
         assertThat(html).contains(
-                "<a class=\"rawnfo-link\" href=\"#\" data-rawnfo=\"" + base64
-                        + "\" data-title=\"Breaking Bad\">Raw data</a>");
+                "<a class=\"rawnfo-link\" href=\"/shows/" + id + "/nfo\" data-title=\"Breaking Bad\">Raw data</a>");
     }
 
     @Test
@@ -112,6 +110,31 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         String html = render("/shows");
 
         assertThat(html).doesNotContain("rawnfo-link");
+    }
+
+    @Test
+    void theRawNfoEndpointServesTheStoredXmlVerbatim() throws Exception {
+        String rawNfo = "<tvshow>\n  <title>Breaking Bad</title>\n  <plot>L'été & \"foes\"</plot>\n</tvshow>";
+        long id = insertShowWithRawNfo("Breaking Bad", rawNfo);
+
+        mockMvc.perform(get("/shows/" + id + "/nfo"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(rawNfo));
+    }
+
+    @Test
+    void theRawNfoEndpointReturns404ForAnUnknownShow() throws Exception {
+        mockMvc.perform(get("/shows/999999/nfo")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void theRawNfoEndpointReturns404WhenTheShowHasNoRawNfo() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+        Long id = jdbcTemplate.queryForObject(
+                "SELECT id FROM show WHERE normalized_title = ?", Long.class,
+                TitleNormalizer.normalize("Unscraped Folder"));
+
+        mockMvc.perform(get("/shows/" + id + "/nfo")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -482,7 +505,7 @@ class ShowListingIT extends PostgresIntegrationTestBase {
                 title, 0, normalizedTitle, "UNKNOWN", new GenreList(List.of()).toStorage(), plot, slug);
     }
 
-    private void insertShowWithRawNfo(String title, String rawNfo) {
+    private long insertShowWithRawNfo(String title, String rawNfo) {
         String normalizedTitle = TitleNormalizer.normalize(title);
         String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
 
@@ -491,6 +514,7 @@ class ShowListingIT extends PostgresIntegrationTestBase {
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 title, 0, normalizedTitle, "UNKNOWN", new GenreList(List.of()).toStorage(), rawNfo, slug);
+        return jdbcTemplate.queryForObject("SELECT id FROM show WHERE slug = ?", Long.class, slug);
     }
 
     private void insertShow(

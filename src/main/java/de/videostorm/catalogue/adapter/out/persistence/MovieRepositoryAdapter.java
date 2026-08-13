@@ -38,6 +38,11 @@ class MovieRepositoryAdapter implements MovieRepository {
                 .toList();
     }
 
+    @Override
+    public Optional<String> findRawNfo(long id) {
+        return jpaRepository.findRawNfoById(id);
+    }
+
     private static Sort sortOf(MovieSort sort) {
         return ListingSort.by(property(sort.field()), sort.direction());
     }
@@ -83,6 +88,6 @@ class MovieRepositoryAdapter implements MovieRepository {
                 Optional.ofNullable(entity.getResolution()),
                 Optional.ofNullable(entity.getImdbId()),
                 Optional.ofNullable(entity.getPlot()),
-                Optional.ofNullable(entity.getRawNfo()));
+                entity.isHasRawNfo());
     }
 }

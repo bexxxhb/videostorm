@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -171,15 +172,13 @@ class MovieListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void aMovieWithRawNfoRendersARawDataLinkCarryingTheUtf8Base64Xml() throws Exception {
-        String rawNfo = "<movie>\n  <title>Heat</title>\n  <plot>L'été & \"foes\"</plot>\n</movie>";
-        insertMovieWithRawNfo("Heat", rawNfo);
+    void aMovieWithRawNfoRendersARawDataLinkToItsOnDemandNfoEndpoint() throws Exception {
+        long id = insertMovieWithRawNfo("Heat", "<movie><title>Heat</title></movie>");
 
         String html = render("/movies");
 
-        String base64 = Base64.getEncoder().encodeToString(rawNfo.getBytes(StandardCharsets.UTF_8));
         assertThat(html).contains(
-                "<a class=\"rawnfo-link\" href=\"#\" data-rawnfo=\"" + base64 + "\" data-title=\"Heat\">Raw data</a>");
+                "<a class=\"rawnfo-link\" href=\"/movies/" + id + "/nfo\" data-title=\"Heat\">Raw data</a>");
     }
 
     @Test
@@ -189,6 +188,31 @@ class MovieListingIT extends PostgresIntegrationTestBase {
         String html = render("/movies");
 
         assertThat(html).doesNotContain("rawnfo-link");
+    }
+
+    @Test
+    void theRawNfoEndpointServesTheStoredXmlVerbatim() throws Exception {
+        String rawNfo = "<movie>\n  <title>Heat</title>\n  <plot>L'été & \"foes\"</plot>\n</movie>";
+        long id = insertMovieWithRawNfo("Heat", rawNfo);
+
+        mockMvc.perform(get("/movies/" + id + "/nfo"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(rawNfo));
+    }
+
+    @Test
+    void theRawNfoEndpointReturns404ForAnUnknownMovie() throws Exception {
+        mockMvc.perform(get("/movies/999999/nfo")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void theRawNfoEndpointReturns404WhenTheMovieHasNoRawNfo() throws Exception {
+        insertMovie("Unscraped Folder", null, null, null, List.of(), null);
+        Long id = jdbcTemplate.queryForObject(
+                "SELECT id FROM movie WHERE normalized_title = ?", Long.class,
+                TitleNormalizer.normalize("Unscraped Folder"));
+
+        mockMvc.perform(get("/movies/" + id + "/nfo")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -462,7 +486,7 @@ class MovieListingIT extends PostgresIntegrationTestBase {
                 title, 0, normalizedTitle, new GenreList(List.of()).toStorage(), plot, slug);
     }
 
-    private void insertMovieWithRawNfo(String title, String rawNfo) {
+    private long insertMovieWithRawNfo(String title, String rawNfo) {
         String normalizedTitle = TitleNormalizer.normalize(title);
         String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
 
@@ -471,6 +495,7 @@ class MovieListingIT extends PostgresIntegrationTestBase {
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 title, 0, normalizedTitle, new GenreList(List.of()).toStorage(), rawNfo, slug);
+        return jdbcTemplate.queryForObject("SELECT id FROM movie WHERE slug = ?", Long.class, slug);
     }
 
     private void insertMovie(

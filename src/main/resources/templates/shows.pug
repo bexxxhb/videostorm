@@ -41,7 +41,7 @@ block content
               a.imdb-link(href=show.imdbUrl)= show.imdbLinkText
           td
             if show.hasRawNfo
-              a.rawnfo-link(href="#", data-rawnfo=show.rawNfoBase64, data-title=show.title) Raw data
+              a.rawnfo-link(href=show.rawNfoUrl, data-title=show.title) Raw data
 
   nav.pagination
     if pagination.firstPageUrl

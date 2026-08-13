@@ -51,8 +51,12 @@ class MovieEntity {
 
     private String plot;
 
-    @Column(name = "raw_nfo")
-    private String rawNfo;
+    // The listing only needs to know whether a raw .nfo exists (to render the "Raw data" link); the
+    // potentially large text itself is fetched on demand, never hydrated with every listing row. A bare
+    // NULL check is a null-bitmap read that never de-TOASTs the text, and matches exactly what the
+    // on-demand content query returns present (a NULL raw_nfo collapses to an empty Optional there).
+    @Formula("(raw_nfo IS NOT NULL)")
+    private boolean hasRawNfo;
 
     // Read-side sort keys (issue #35). Each maps a "no value" to NULL so the listing can push those
     // entries to the end of the order — in both directions — with NULLS LAST, which a raw column cannot

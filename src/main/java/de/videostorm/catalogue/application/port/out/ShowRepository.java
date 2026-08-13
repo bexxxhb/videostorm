@@ -5,6 +5,7 @@ import de.videostorm.catalogue.domain.SearchTerm;
 import de.videostorm.catalogue.domain.Show;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Outbound port for reading the live show table. The read side never touches the filesystem —
@@ -21,4 +22,10 @@ public interface ShowRepository {
      * directions) and {@code id} as a deterministic tiebreak. {@code pageNumber} is 1-based.
      */
     List<Show> findPage(SearchTerm searchTerm, ShowSort sort, int pageNumber, int pageSize);
+
+    /**
+     * The raw {@code .nfo} text for the show with {@code id}, fetched on demand. Empty when there is
+     * no such show or its {@code raw_nfo} is null.
+     */
+    Optional<String> findRawNfo(long id);
 }

@@ -5,6 +5,7 @@ import de.videostorm.catalogue.domain.Movie;
 import de.videostorm.catalogue.domain.SearchTerm;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Outbound port for reading the live movie table. The read side never touches the filesystem —
@@ -21,4 +22,10 @@ public interface MovieRepository {
      * directions) and {@code id} as a deterministic tiebreak. {@code pageNumber} is 1-based.
      */
     List<Movie> findPage(SearchTerm searchTerm, MovieSort sort, int pageNumber, int pageSize);
+
+    /**
+     * The raw {@code .nfo} text for the movie with {@code id}, fetched on demand. Empty when there is
+     * no such movie or its {@code raw_nfo} is null.
+     */
+    Optional<String> findRawNfo(long id);
 }

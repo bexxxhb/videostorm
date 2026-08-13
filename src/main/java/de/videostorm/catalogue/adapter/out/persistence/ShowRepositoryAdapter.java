@@ -39,6 +39,11 @@ class ShowRepositoryAdapter implements ShowRepository {
                 .toList();
     }
 
+    @Override
+    public Optional<String> findRawNfo(long id) {
+        return jpaRepository.findRawNfoById(id);
+    }
+
     private static Sort sortOf(ShowSort sort) {
         return ListingSort.by(property(sort.field()), sort.direction());
     }
@@ -84,6 +89,6 @@ class ShowRepositoryAdapter implements ShowRepository {
                 entity.getSeasonCount(),
                 entity.getEpisodeCount(),
                 Optional.ofNullable(entity.getImdbId()),
-                Optional.ofNullable(entity.getRawNfo()));
+                entity.isHasRawNfo());
     }
 }

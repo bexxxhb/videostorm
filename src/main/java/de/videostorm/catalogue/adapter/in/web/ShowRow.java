@@ -40,14 +40,13 @@ public class ShowRow {
     // base64-encoded) so quotes, angle brackets, accents and newlines survive the attribute round-trip.
     private final boolean hasPlot;
     private final String plotBase64;
-    // The "Raw data" link renders only when true; the dialog reads the raw .nfo from rawNfoBase64
-    // (UTF-8 bytes, base64-encoded) so the XML survives the attribute round-trip verbatim.
+    // The "Raw data" link renders only when true; the dialog fetches the (potentially large) raw .nfo
+    // from rawNfoUrl on demand, so the listing never carries the text for every row.
     private final boolean hasRawNfo;
-    private final String rawNfoBase64;
+    private final String rawNfoUrl;
 
     static ShowRow from(Show show, int index) {
         Optional<String> plot = show.plot().filter(text -> !text.isBlank());
-        Optional<String> rawNfo = show.rawNfo().filter(text -> !text.isBlank());
         Optional<String> imdbId = show.imdbId().filter(id -> !id.isBlank());
         return new ShowRow(
                 index % 2 == 0 ? EVEN_ROW_CLASS : ODD_ROW_CLASS,
@@ -63,8 +62,8 @@ public class ShowRow {
                 imdbId.isPresent() ? IMDB_LINK_TEXT : "",
                 plot.isPresent(),
                 plot.map(ShowRow::encodeBase64).orElse(""),
-                rawNfo.isPresent(),
-                rawNfo.map(ShowRow::encodeBase64).orElse(""));
+                show.hasRawNfo(),
+                show.hasRawNfo() ? "/shows/" + show.id() + "/nfo" : "");
     }
 
     private static String encodeBase64(String text) {
