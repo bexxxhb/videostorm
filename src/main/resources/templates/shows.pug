@@ -3,15 +3,20 @@ extends layout
 block content
   form.search(method="get", action="/shows")
     input.search__input(type="search", name="q", value=query, placeholder="Search title, genre or started")
+    input(type="hidden", name="sort", value=sort.field)
+    input(type="hidden", name="dir", value=sort.direction)
     button.search__button(type="submit") Search
 
   table.catalogue
     thead
       tr
-        th Title
-        th Started
+        th
+          a.sort-link(href=sort.title.url) Title !{sort.title.marker}
+        th
+          a.sort-link(href=sort.year.url) Started !{sort.year.marker}
         th Status
-        th Rating
+        th
+          a.sort-link(href=sort.rating.url) Rating !{sort.rating.marker}
         th Genres
         th Seasons
         th Total Episodes

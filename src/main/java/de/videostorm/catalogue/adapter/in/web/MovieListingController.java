@@ -1,6 +1,7 @@
 package de.videostorm.catalogue.adapter.in.web;
 
 import de.videostorm.catalogue.application.MoviePage;
+import de.videostorm.catalogue.application.MovieSort;
 import de.videostorm.catalogue.application.port.in.ListMoviesQuery;
 import de.videostorm.catalogue.domain.Movie;
 import lombok.RequiredArgsConstructor;
@@ -27,8 +28,11 @@ public class MovieListingController {
     public String listMovies(
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "q", defaultValue = "") String query,
+            @RequestParam(name = "sort", required = false) String sort,
+            @RequestParam(name = "dir", required = false) String dir,
             Model model) {
-        MoviePage moviePage = listMoviesQuery.list(page, query);
+        MovieSort movieSort = MovieSort.fromParams(sort, dir);
+        MoviePage moviePage = listMoviesQuery.list(page, query, movieSort);
 
         List<Movie> movies = moviePage.movies();
         List<MovieRow> rows = IntStream.range(0, movies.size())
@@ -40,9 +44,11 @@ public class MovieListingController {
         model.addAttribute("totalPages", moviePage.totalPages());
         model.addAttribute("totalElements", moviePage.totalElements());
         model.addAttribute("query", moviePage.query());
+        model.addAttribute("sort", MovieSortView.from(moviePage.sort(), moviePage.query(), "/movies"));
         model.addAttribute("pagination", PaginationLinks.from(
                 moviePage.pageNumber(), moviePage.totalPages(),
-                moviePage.hasPrevious(), moviePage.hasNext(), moviePage.query(), "/movies"));
+                moviePage.hasPrevious(), moviePage.hasNext(), moviePage.query(),
+                moviePage.sort().field().param(), moviePage.sort().direction().param(), "/movies"));
         model.addAttribute("activeTab", "movies");
 
         return "movies";

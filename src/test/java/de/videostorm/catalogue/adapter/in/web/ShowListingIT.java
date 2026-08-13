@@ -54,20 +54,20 @@ class ShowListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void rendersEveryShowColumnHeader() throws Exception {
+    void rendersEveryShowColumnHeaderWithSortableOnesAsLinksAndNoResolution() throws Exception {
         String html = render("/shows");
 
         assertThat(html)
-                .contains("<th>Title</th>")
-                .contains("<th>Started</th>")
+                .contains(">Title " + SortHeader.ASC_MARKER + "</a>")
+                .contains(">Started " + SortHeader.NEUTRAL_MARKER + "</a>")
+                .contains(">Rating " + SortHeader.NEUTRAL_MARKER + "</a>")
                 .contains("<th>Status</th>")
-                .contains("<th>Rating</th>")
                 .contains("<th>Genres</th>")
                 .contains("<th>Seasons</th>")
                 .contains("<th>Total Episodes</th>")
                 .contains("<th>Plot</th>")
                 .contains("<th>IMDb</th>")
-                .doesNotContain("<th>Year</th>");
+                .doesNotContain("Resolution");
     }
 
     @Test
@@ -158,10 +158,10 @@ class ShowListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void theMoviesPageKeepsItsYearHeaderUnchanged() throws Exception {
+    void theMoviesPageLabelsItsYearColumnYearNotStarted() throws Exception {
         String html = render("/movies");
 
-        assertThat(html).contains("<th>Year</th>").doesNotContain("<th>Started</th>");
+        assertThat(html).contains(">Year " + SortHeader.NEUTRAL_MARKER + "</a>").doesNotContain("Started");
     }
 
     @Test
@@ -233,17 +233,45 @@ class ShowListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void tiesBreakDeterministicallyOnYearThenId() throws Exception {
-        insertShow("The Thing", 2011, "UNKNOWN", null, null, List.of());
+    void tiesOnTheSortedColumnBreakDeterministicallyOnId() throws Exception {
+        insertShow("The Thing", 2011, "UNKNOWN", null, null, List.of()); // inserted first, so lower id
         insertShow("The Thing", 1982, "UNKNOWN", null, null, List.of());
 
         String html = render("/shows");
 
-        int earlier = html.indexOf("<td>1982</td>");
-        int later = html.indexOf("<td>2011</td>");
+        int first = html.indexOf("<td>2011</td>");
+        int second = html.indexOf("<td>1982</td>");
 
-        assertThat(earlier).isPositive();
-        assertThat(later).isGreaterThan(earlier);
+        assertThat(first).isPositive();
+        assertThat(second).isGreaterThan(first);
+    }
+
+    @Test
+    void sortsByStartedYearAscendingWithUnknownYearsLast() throws Exception {
+        insertShow("Old Show", 1980, "UNKNOWN", null, null, List.of());
+        insertShow("New Show", 2020, "UNKNOWN", null, null, List.of());
+        insertShow("Undated Show", null, "UNKNOWN", null, null, List.of()); // year sentinel 0
+
+        String html = render("/shows?sort=year&dir=asc");
+
+        assertThat(indexOf(html, "Old Show"))
+                .isLessThan(indexOf(html, "New Show"))
+                .isLessThan(indexOf(html, "Undated Show"));
+        assertThat(indexOf(html, "New Show")).isLessThan(indexOf(html, "Undated Show"));
+    }
+
+    @Test
+    void sortsByRatingDescendingWithUnratedShowsLast() throws Exception {
+        insertShow("Lower Rated", 2000, "UNKNOWN", "TVDB", new BigDecimal("6.1"), List.of());
+        insertShow("Higher Rated", 2000, "UNKNOWN", "TVDB", new BigDecimal("9.2"), List.of());
+        insertShow("Unrated", 2000, "UNKNOWN", null, null, List.of());
+
+        String html = render("/shows?sort=rating&dir=desc");
+
+        assertThat(indexOf(html, "Higher Rated"))
+                .isLessThan(indexOf(html, "Lower Rated"))
+                .isLessThan(indexOf(html, "Unrated"));
+        assertThat(indexOf(html, "Lower Rated")).isLessThan(indexOf(html, "Unrated"));
     }
 
     @Test
@@ -256,8 +284,8 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         assertThat(html).contains("120 total");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">First</span>");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">Previous</span>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=2\">Next</a>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=3\">Last</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=2&amp;sort=title&amp;dir=asc\">Next</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=3&amp;sort=title&amp;dir=asc\">Last</a>");
         assertThat(html).contains("<td>Show 001</td>");
         assertThat(html).contains("<td>Show 050</td>");
         assertThat(html).doesNotContain("<td>Show 051</td>");
@@ -272,8 +300,8 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         assertThat(html).contains("Page 3 of 3");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">Next</span>");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">Last</span>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=1\">First</a>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=2\">Previous</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=1&amp;sort=title&amp;dir=asc\">First</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=2&amp;sort=title&amp;dir=asc\">Previous</a>");
         assertThat(html).contains("<td>Show 101</td>");
         assertThat(html).contains("<td>Show 120</td>");
     }
@@ -363,7 +391,7 @@ class ShowListingIT extends PostgresIntegrationTestBase {
 
         assertThat(html).contains("Page 1 of 2");
         assertThat(html).contains("60 total");
-        assertThat(html).contains("href=\"/shows?page=2&amp;q=batman\"");
+        assertThat(html).contains("href=\"/shows?page=2&amp;q=batman&amp;sort=title&amp;dir=asc\"");
     }
 
     @Test
@@ -379,6 +407,12 @@ class ShowListingIT extends PostgresIntegrationTestBase {
 
         assertThat(showsHtml).contains("<td>Show Only</td>");
         assertThat(moviesHtml).contains("<td>Movie Only</td>");
+    }
+
+    private static int indexOf(String html, String title) {
+        int index = html.indexOf("<td>" + title + "</td>");
+        assertThat(index).as("row for %s", title).isGreaterThanOrEqualTo(0);
+        return index;
     }
 
     private void seedShows(int count) {

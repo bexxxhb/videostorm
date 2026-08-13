@@ -4,8 +4,13 @@ import de.videostorm.catalogue.domain.Show;
 
 import java.util.List;
 
-/** {@code query} is the trimmed, raw search box input that produced this page — echoed back into the search box and pagination links. */
-public record ShowPage(List<Show> shows, int pageNumber, int totalPages, long totalElements, String query) {
+/**
+ * {@code query} is the trimmed, raw search box input that produced this page — echoed back into the
+ * search box and pagination links. {@code sort} is the active column and direction, carried so the
+ * headers, pagination links and search form can preserve it.
+ */
+public record ShowPage(List<Show> shows, int pageNumber, int totalPages, long totalElements,
+                       String query, ShowSort sort) {
 
     public boolean hasPrevious() {
         return pageNumber > 1;

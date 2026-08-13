@@ -51,18 +51,73 @@ class MovieListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void rendersEveryMovieColumnHeader() throws Exception {
+    void rendersEveryMovieColumnHeaderWithSortableOnesAsLinks() throws Exception {
         String html = render("/movies");
 
+        // Sortable columns render as links; the rest stay plain.
         assertThat(html)
-                .contains("<th>Title</th>")
-                .contains("<th>Year</th>")
-                .contains("<th>Rating</th>")
+                .contains(">Title " + SortHeader.ASC_MARKER + "</a>")
+                .contains(">Year " + SortHeader.NEUTRAL_MARKER + "</a>")
+                .contains(">Rating " + SortHeader.NEUTRAL_MARKER + "</a>")
+                .contains(">Resolution " + SortHeader.NEUTRAL_MARKER + "</a>")
                 .contains("<th>Genres</th>")
                 .contains("<th>Runtime</th>")
-                .contains("<th>Resolution</th>")
                 .contains("<th>Plot</th>")
                 .contains("<th>IMDb</th>");
+    }
+
+    @Test
+    void sortsByYearAscendingWithUnknownYearsLastThenByYearDescendingStillUnknownLast() throws Exception {
+        insertMovie("Old Film", 1980, null, null, List.of(), null);
+        insertMovie("New Film", 2020, null, null, List.of(), null);
+        insertMovie("Undated Film", null, null, null, List.of(), null); // year sentinel 0
+
+        String ascending = render("/movies?sort=year&dir=asc");
+        assertThat(indexOf(ascending, "Old Film"))
+                .isLessThan(indexOf(ascending, "New Film"))
+                .isLessThan(indexOf(ascending, "Undated Film"));
+        assertThat(indexOf(ascending, "New Film")).isLessThan(indexOf(ascending, "Undated Film"));
+
+        String descending = render("/movies?sort=year&dir=desc");
+        assertThat(indexOf(descending, "New Film"))
+                .isLessThan(indexOf(descending, "Old Film"))
+                .isLessThan(indexOf(descending, "Undated Film"));
+        assertThat(indexOf(descending, "Old Film")).isLessThan(indexOf(descending, "Undated Film"));
+    }
+
+    @Test
+    void sortsByRatingDescendingWithUnratedMoviesLast() throws Exception {
+        insertMovie("Lower Rated", 2000, "TMDB", new BigDecimal("6.1"), List.of(), null);
+        insertMovie("Higher Rated", 2000, "TMDB", new BigDecimal("8.9"), List.of(), null);
+        insertMovie("Unrated", 2000, null, null, List.of(), null);
+
+        String html = render("/movies?sort=rating&dir=desc");
+
+        assertThat(indexOf(html, "Higher Rated"))
+                .isLessThan(indexOf(html, "Lower Rated"))
+                .isLessThan(indexOf(html, "Unrated"));
+        assertThat(indexOf(html, "Lower Rated")).isLessThan(indexOf(html, "Unrated"));
+    }
+
+    @Test
+    void sortsByResolutionNumericallyByPixelHeightNotLexicographicallyWithAbsentLast() throws Exception {
+        insertMovieWithResolutionAndImdb("SD Film", "576p", null);
+        insertMovieWithResolutionAndImdb("HD Film", "720p", null);
+        insertMovieWithResolutionAndImdb("Full HD Film", "1080p", null);
+        insertMovieWithResolutionAndImdb("UHD Film", "2160p", null);
+        insertMovie("No Resolution", 2000, null, null, List.of(), null);
+
+        String html = render("/movies?sort=resolution&dir=desc");
+
+        // Numeric height, so 2160 > 1080 > 720 > 576 — "1080p" must not sort before "720p".
+        assertThat(indexOf(html, "UHD Film"))
+                .isLessThan(indexOf(html, "Full HD Film"))
+                .isLessThan(indexOf(html, "HD Film"))
+                .isLessThan(indexOf(html, "SD Film"))
+                .isLessThan(indexOf(html, "No Resolution"));
+        assertThat(indexOf(html, "Full HD Film")).isLessThan(indexOf(html, "HD Film"));
+        assertThat(indexOf(html, "HD Film")).isLessThan(indexOf(html, "SD Film"));
+        assertThat(indexOf(html, "SD Film")).isLessThan(indexOf(html, "No Resolution"));
     }
 
     @Test
@@ -192,17 +247,17 @@ class MovieListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void tiesBreakDeterministicallyOnYearThenId() throws Exception {
-        insertMovie("The Thing", 2011, null, null, List.of(), null);
+    void tiesOnTheSortedColumnBreakDeterministicallyOnId() throws Exception {
+        insertMovie("The Thing", 2011, null, null, List.of(), null); // inserted first, so lower id
         insertMovie("The Thing", 1982, null, null, List.of(), null);
 
         String html = render("/movies");
 
-        int earlier = html.indexOf("<td>1982</td>");
-        int later = html.indexOf("<td>2011</td>");
+        int first = html.indexOf("<td>2011</td>");
+        int second = html.indexOf("<td>1982</td>");
 
-        assertThat(earlier).isPositive();
-        assertThat(later).isGreaterThan(earlier);
+        assertThat(first).isPositive();
+        assertThat(second).isGreaterThan(first);
     }
 
     @Test
@@ -215,8 +270,8 @@ class MovieListingIT extends PostgresIntegrationTestBase {
         assertThat(html).contains("120 total");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">First</span>");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">Previous</span>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/movies?page=2\">Next</a>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/movies?page=3\">Last</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/movies?page=2&amp;sort=title&amp;dir=asc\">Next</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/movies?page=3&amp;sort=title&amp;dir=asc\">Last</a>");
         assertThat(html).contains("<td>Movie 001</td>");
         assertThat(html).contains("<td>Movie 050</td>");
         assertThat(html).doesNotContain("<td>Movie 051</td>");
@@ -231,8 +286,8 @@ class MovieListingIT extends PostgresIntegrationTestBase {
         assertThat(html).contains("Page 3 of 3");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">Next</span>");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">Last</span>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/movies?page=1\">First</a>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/movies?page=2\">Previous</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/movies?page=1&amp;sort=title&amp;dir=asc\">First</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/movies?page=2&amp;sort=title&amp;dir=asc\">Previous</a>");
         assertThat(html).contains("<td>Movie 101</td>");
         assertThat(html).contains("<td>Movie 120</td>");
     }
@@ -348,7 +403,7 @@ class MovieListingIT extends PostgresIntegrationTestBase {
 
         assertThat(html).contains("Page 1 of 2");
         assertThat(html).contains("60 total");
-        assertThat(html).contains("href=\"/movies?page=2&amp;q=batman\"");
+        assertThat(html).contains("href=\"/movies?page=2&amp;q=batman&amp;sort=title&amp;dir=asc\"");
     }
 
     private void seedMovies(int count) {
@@ -400,6 +455,12 @@ class MovieListingIT extends PostgresIntegrationTestBase {
                 """,
                 title, originalTitle, year == null ? 0 : year, normalizedTitle, normalizedOriginalTitle,
                 ratingSource, ratingValue, genres, runtimeMinutes, slug);
+    }
+
+    private static int indexOf(String html, String title) {
+        int index = html.indexOf("<td>" + title + "</td>");
+        assertThat(index).as("row for %s", title).isGreaterThanOrEqualTo(0);
+        return index;
     }
 
     private String render(String path) throws Exception {

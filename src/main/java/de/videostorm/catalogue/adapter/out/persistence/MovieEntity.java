@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Formula;
 
 import java.math.BigDecimal;
 
@@ -49,4 +50,20 @@ class MovieEntity {
     private String imdbId;
 
     private String plot;
+
+    // Read-side sort keys (issue #35). Each maps a "no value" to NULL so the listing can push those
+    // entries to the end of the order — in both directions — with NULLS LAST, which a raw column cannot
+    // do for the non-null sentinels (a blank title, the year 0). Hibernate qualifies the unaliased
+    // column names with this entity's table alias.
+    @Formula("NULLIF(normalized_title, '')")
+    private String titleSort;
+
+    @Formula("NULLIF(year, 0)")
+    private Integer yearSort;
+
+    // The numeric pixel height behind the p-suffixed resolution string (e.g. 1080p -> 1080), so the
+    // column orders numerically (2160 > 1080 > 720) rather than lexicographically. NULL when the film
+    // carries no resolution or no digits, so it sorts last.
+    @Formula("CAST(NULLIF(regexp_replace(COALESCE(resolution, ''), '[^0-9]', '', 'g'), '') AS INTEGER)")
+    private Integer resolutionHeight;
 }

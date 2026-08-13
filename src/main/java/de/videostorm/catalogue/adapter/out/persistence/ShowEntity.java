@@ -56,4 +56,13 @@ class ShowEntity {
 
     @Formula("(SELECT COUNT(*) FROM episode e WHERE e.show_id = id)")
     private int episodeCount;
+
+    // Read-side sort keys (issue #35). Each maps a "no value" to NULL so the listing can push those
+    // entries to the end of the order — in both directions — with NULLS LAST, which a raw column cannot
+    // do for the non-null sentinels (a blank title, the year 0). Shows have no resolution column.
+    @Formula("NULLIF(normalized_title, '')")
+    private String titleSort;
+
+    @Formula("NULLIF(year, 0)")
+    private Integer yearSort;
 }

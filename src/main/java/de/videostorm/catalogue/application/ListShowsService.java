@@ -18,13 +18,13 @@ class ListShowsService implements ListShowsQuery {
     private final ShowRepository showRepository;
 
     @Override
-    public ShowPage list(int requestedPage, String query) {
+    public ShowPage list(int requestedPage, String query, ShowSort sort) {
         SearchTerm searchTerm = new SearchTerm(query);
         long totalElements = showRepository.count(searchTerm);
         int totalPages = totalElements == 0 ? 1 : (int) Math.ceil((double) totalElements / PAGE_SIZE);
         int pageNumber = clamp(requestedPage, totalPages);
-        List<Show> shows = showRepository.findPage(searchTerm, pageNumber, PAGE_SIZE);
-        return new ShowPage(shows, pageNumber, totalPages, totalElements, searchTerm.raw());
+        List<Show> shows = showRepository.findPage(searchTerm, sort, pageNumber, PAGE_SIZE);
+        return new ShowPage(shows, pageNumber, totalPages, totalElements, searchTerm.raw(), sort);
     }
 
     private static int clamp(int requestedPage, int totalPages) {
