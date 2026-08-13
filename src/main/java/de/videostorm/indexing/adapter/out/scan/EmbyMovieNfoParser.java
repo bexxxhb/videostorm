@@ -1,7 +1,10 @@
 package de.videostorm.indexing.adapter.out.scan;
 
 import de.videostorm.indexing.domain.ParsedMovie;
+import de.videostorm.indexing.domain.ParsedRating;
 import org.w3c.dom.Element;
+
+import java.util.List;
 
 /**
  * Reads an Emby movie {@code .nfo} into a {@link ParsedMovie}. This is an adapter concern: it lives
@@ -17,15 +20,24 @@ class EmbyMovieNfoParser {
                 EmbyNfo.text(root, "title"),
                 EmbyNfo.text(root, "originaltitle"),
                 EmbyNfo.integer(root, "year"),
-                EmbyNfo.ratings(root),
+                ratings(root),
                 EmbyNfo.genres(root),
-                EmbyNfo.integer(root, "runtime"),
+                EmbyNfo.leadingInteger(root, "runtime"),
                 EmbyNfo.text(root, "plot"),
                 setName(root),
                 collectionId(root),
                 EmbyNfo.uniqueId(root, "imdb"),
                 EmbyNfo.uniqueId(root, "tvdb"),
                 EmbyNfo.uniqueId(root, "tmdb"));
+    }
+
+    /**
+     * The structured {@code <ratings>} block wins; only when it yields nothing does the movie path fall
+     * back to a flat top-level {@code <rating>}. Shows never reach this fallback.
+     */
+    private static List<ParsedRating> ratings(Element root) {
+        List<ParsedRating> structured = EmbyNfo.ratings(root);
+        return structured.isEmpty() ? EmbyNfo.flatMovieRating(root) : structured;
     }
 
     private static String setName(Element root) {

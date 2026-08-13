@@ -13,6 +13,8 @@ import java.io.StringReader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The XML technology shared by the Emby {@code .nfo} readers: secure parsing plus the field
@@ -77,6 +79,21 @@ final class EmbyNfo {
         return ratings;
     }
 
+    /**
+     * Movie-only fallback for a flat {@code <rating>7.3</rating>} written directly under {@code <movie>}
+     * (value in text content, no wrapping {@code <ratings>}, no provider name or scale) with its sibling
+     * {@code <votes>}. Yields a single default rating labelled {@code TMDB}, or an empty list when there
+     * is no flat rating or its value does not parse. Only {@link EmbyMovieNfoParser} calls this — the
+     * shared {@link #ratings(Element)} used by shows is left untouched.
+     */
+    static List<ParsedRating> flatMovieRating(Element root) {
+        BigDecimal value = decimal(text(root, "rating"));
+        if (value == null) {
+            return List.of();
+        }
+        return List.of(new ParsedRating("TMDB", value, null, integer(text(root, "votes")), true));
+    }
+
     static List<String> genres(Element root) {
         List<String> genres = new ArrayList<>();
         for (Element genre : children(root, "genre")) {
@@ -100,6 +117,26 @@ final class EmbyNfo {
     static Integer integer(Element root, String tag) {
         return integer(text(root, tag));
     }
+
+    /**
+     * Movie-only tolerant runtime parse: takes the leading run of digits from {@code <runtime>} and
+     * ignores any trailing non-numeric suffix, so {@code "90 min (25 fps)"} and {@code "90"} both yield
+     * {@code 90}. A leading thousands separator is kept in the run and stripped by {@link #integer(String)}
+     * ({@code "1,234 min"} yields {@code 1234}), matching the strict parse. A value with no leading digits
+     * (missing, empty, {@code "N/A"}) yields {@code null}. Only {@link EmbyMovieNfoParser} calls this; the
+     * shared {@link #integer(Element, String)} that shows and the {@code year}/{@code votes} fields rely on
+     * is left strict and untouched.
+     */
+    static Integer leadingInteger(Element root, String tag) {
+        String value = text(root, tag);
+        if (value == null) {
+            return null;
+        }
+        Matcher digits = LEADING_DIGITS.matcher(value);
+        return digits.find() ? integer(digits.group()) : null;
+    }
+
+    private static final Pattern LEADING_DIGITS = Pattern.compile("^\\d[\\d,]*");
 
     private static Integer integer(String value) {
         if (value == null) {

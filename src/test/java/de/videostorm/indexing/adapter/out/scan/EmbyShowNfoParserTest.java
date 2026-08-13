@@ -86,6 +86,21 @@ class EmbyShowNfoParserTest {
     }
 
     @Test
+    void ignoresAFlatTopLevelRatingSoShowsAreUnaffected() {
+        // The flat-<rating> fallback is movie-only; a show with the same shape must import as before,
+        // i.e. with no rating at all.
+        ParsedShow show = parser.parse("""
+                <tvshow>
+                  <title>Flat Rated Show</title>
+                  <rating>7.3</rating>
+                  <votes>659</votes>
+                </tvshow>
+                """);
+
+        assertThat(show.ratings()).isEmpty();
+    }
+
+    @Test
     void rejectsAStructurallyBrokenFileSoTheScanCanTreatItAsAbsent() {
         assertThatThrownBy(() -> parser.parse("<tvshow><title>Truncated"))
                 .isInstanceOf(NfoParseException.class);
