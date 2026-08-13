@@ -80,9 +80,9 @@ class MaintenanceSecurityTest {
 
     @Test
     void staticJavaScriptIsServedPubliclySoThePlotDialogWiresUp() throws Exception {
-        // The plot dialog only opens if /js/plot-dialog.js loads; without /js/** permitted the filter
-        // chain redirects the unauthenticated request to /login and the script never runs.
-        mockMvc.perform(get("/js/plot-dialog.js")).andExpect(status().isOk());
+        // The plot/raw-data dialog only opens if /js/content-dialog.js loads; without /js/** permitted
+        // the filter chain redirects the unauthenticated request to /login and the script never runs.
+        mockMvc.perform(get("/js/content-dialog.js")).andExpect(status().isOk());
     }
 
     @Test

@@ -63,7 +63,8 @@ class MovieListingIT extends PostgresIntegrationTestBase {
                 .contains("<th>Genres</th>")
                 .contains("<th>Runtime</th>")
                 .contains("<th>Plot</th>")
-                .contains("<th>IMDb</th>");
+                .contains("<th>IMDb</th>")
+                .contains("<th>nfo raw</th>");
     }
 
     @Test
@@ -167,6 +168,27 @@ class MovieListingIT extends PostgresIntegrationTestBase {
         String html = render("/movies");
 
         assertThat(html).doesNotContain("plot-link");
+    }
+
+    @Test
+    void aMovieWithRawNfoRendersARawDataLinkCarryingTheUtf8Base64Xml() throws Exception {
+        String rawNfo = "<movie>\n  <title>Heat</title>\n  <plot>L'été & \"foes\"</plot>\n</movie>";
+        insertMovieWithRawNfo("Heat", rawNfo);
+
+        String html = render("/movies");
+
+        String base64 = Base64.getEncoder().encodeToString(rawNfo.getBytes(StandardCharsets.UTF_8));
+        assertThat(html).contains(
+                "<a class=\"rawnfo-link\" href=\"#\" data-rawnfo=\"" + base64 + "\" data-title=\"Heat\">Raw data</a>");
+    }
+
+    @Test
+    void aMovieWithoutRawNfoRendersAnEmptyCellWithNoLink() throws Exception {
+        insertMovie("Unscraped Folder", null, null, null, List.of(), null);
+
+        String html = render("/movies");
+
+        assertThat(html).doesNotContain("rawnfo-link");
     }
 
     @Test
@@ -438,6 +460,17 @@ class MovieListingIT extends PostgresIntegrationTestBase {
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 title, 0, normalizedTitle, new GenreList(List.of()).toStorage(), plot, slug);
+    }
+
+    private void insertMovieWithRawNfo(String title, String rawNfo) {
+        String normalizedTitle = TitleNormalizer.normalize(title);
+        String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
+
+        jdbcTemplate.update("""
+                INSERT INTO movie (title, year, normalized_title, genres, raw_nfo, slug)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                title, 0, normalizedTitle, new GenreList(List.of()).toStorage(), rawNfo, slug);
     }
 
     private void insertMovie(

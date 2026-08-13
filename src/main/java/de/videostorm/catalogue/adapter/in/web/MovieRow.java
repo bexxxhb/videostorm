@@ -40,9 +40,14 @@ public class MovieRow {
     // base64-encoded) so quotes, angle brackets, accents and newlines survive the attribute round-trip.
     private final boolean hasPlot;
     private final String plotBase64;
+    // The "Raw data" link renders only when true; the dialog reads the raw .nfo from rawNfoBase64
+    // (UTF-8 bytes, base64-encoded) so the XML survives the attribute round-trip verbatim.
+    private final boolean hasRawNfo;
+    private final String rawNfoBase64;
 
     static MovieRow from(Movie movie, int index) {
         Optional<String> plot = movie.plot().filter(text -> !text.isBlank());
+        Optional<String> rawNfo = movie.rawNfo().filter(text -> !text.isBlank());
         Optional<String> imdbId = movie.imdbId().filter(id -> !id.isBlank());
         return new MovieRow(
                 index % 2 == 0 ? EVEN_ROW_CLASS : ODD_ROW_CLASS,
@@ -56,10 +61,12 @@ public class MovieRow {
                 imdbId.map(id -> "https://www.imdb.com/title/" + id + "/").orElse(""),
                 imdbId.isPresent() ? IMDB_LINK_TEXT : "",
                 plot.isPresent(),
-                plot.map(MovieRow::encodeBase64).orElse(""));
+                plot.map(MovieRow::encodeBase64).orElse(""),
+                rawNfo.isPresent(),
+                rawNfo.map(MovieRow::encodeBase64).orElse(""));
     }
 
-    private static String encodeBase64(String plot) {
-        return Base64.getEncoder().encodeToString(plot.getBytes(StandardCharsets.UTF_8));
+    private static String encodeBase64(String text) {
+        return Base64.getEncoder().encodeToString(text.getBytes(StandardCharsets.UTF_8));
     }
 }

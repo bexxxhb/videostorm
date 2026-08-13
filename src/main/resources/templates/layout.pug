@@ -22,10 +22,10 @@ html(lang="en")
         a.tab(href="/shows") Shows
     main.content
       block content
-    dialog.plot-dialog#plot-dialog
-      .plot-dialog__panel
-        .plot-dialog__head
-          h2.plot-dialog__title
-          button.plot-dialog__close(type="button", aria-label="Close") ×
-        .plot-dialog__body
-    script(src="/js/plot-dialog.js", defer)
+    dialog.content-dialog#content-dialog
+      .content-dialog__panel
+        .content-dialog__head
+          h2.content-dialog__title
+          button.content-dialog__close(type="button", aria-label="Close") ×
+        .content-dialog__body
+    script(src="/js/content-dialog.js", defer)

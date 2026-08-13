@@ -13,5 +13,6 @@ public record Show(
         Optional<String> plot,
         int seasonCount,
         int episodeCount,
-        Optional<String> imdbId) {
+        Optional<String> imdbId,
+        Optional<String> rawNfo) {
 }

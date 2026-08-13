@@ -48,6 +48,9 @@ class ShowEntity {
     @Column(name = "imdb_id")
     private String imdbId;
 
+    @Column(name = "raw_nfo")
+    private String rawNfo;
+
     // Read-side aggregates over the episode table (issue #27); episodes have no JPA entity of their own,
     // so they are derived here as correlated subqueries. A show with no episode rows yields 0/0, which the
     // listing renders verbatim. Hibernate qualifies the unaliased `id` with this entity's table alias.

@@ -83,6 +83,7 @@ class ShowRepositoryAdapter implements ShowRepository {
                 Optional.ofNullable(entity.getPlot()),
                 entity.getSeasonCount(),
                 entity.getEpisodeCount(),
-                Optional.ofNullable(entity.getImdbId()));
+                Optional.ofNullable(entity.getImdbId()),
+                Optional.ofNullable(entity.getRawNfo()));
     }
 }

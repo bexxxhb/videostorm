@@ -51,6 +51,9 @@ class MovieEntity {
 
     private String plot;
 
+    @Column(name = "raw_nfo")
+    private String rawNfo;
+
     // Read-side sort keys (issue #35). Each maps a "no value" to NULL so the listing can push those
     // entries to the end of the order — in both directions — with NULLS LAST, which a raw column cannot
     // do for the non-null sentinels (a blank title, the year 0). Hibernate qualifies the unaliased

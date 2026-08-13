@@ -82,6 +82,7 @@ class MovieRepositoryAdapter implements MovieRepository {
                 Optional.ofNullable(entity.getRuntimeMinutes()),
                 Optional.ofNullable(entity.getResolution()),
                 Optional.ofNullable(entity.getImdbId()),
-                Optional.ofNullable(entity.getPlot()));
+                Optional.ofNullable(entity.getPlot()),
+                Optional.ofNullable(entity.getRawNfo()));
     }
 }

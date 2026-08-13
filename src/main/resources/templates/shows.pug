@@ -22,6 +22,7 @@ block content
         th Total Episodes
         th Plot
         th IMDb
+        th nfo raw
     tbody
       each show in shows
         tr(class=show.rowClass)
@@ -38,6 +39,9 @@ block content
           td
             if show.imdbUrl
               a.imdb-link(href=show.imdbUrl)= show.imdbLinkText
+          td
+            if show.hasRawNfo
+              a.rawnfo-link(href="#", data-rawnfo=show.rawNfoBase64, data-title=show.title) Raw data
 
   nav.pagination
     if pagination.firstPageUrl

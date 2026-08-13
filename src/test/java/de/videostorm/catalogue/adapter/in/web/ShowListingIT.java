@@ -67,6 +67,7 @@ class ShowListingIT extends PostgresIntegrationTestBase {
                 .contains("<th>Total Episodes</th>")
                 .contains("<th>Plot</th>")
                 .contains("<th>IMDb</th>")
+                .contains("<th>nfo raw</th>")
                 .doesNotContain("Resolution");
     }
 
@@ -89,6 +90,28 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         String html = render("/shows");
 
         assertThat(html).doesNotContain("plot-link");
+    }
+
+    @Test
+    void aShowWithRawNfoRendersARawDataLinkCarryingTheUtf8Base64Xml() throws Exception {
+        String rawNfo = "<tvshow>\n  <title>Breaking Bad</title>\n  <plot>L'été & \"foes\"</plot>\n</tvshow>";
+        insertShowWithRawNfo("Breaking Bad", rawNfo);
+
+        String html = render("/shows");
+
+        String base64 = Base64.getEncoder().encodeToString(rawNfo.getBytes(StandardCharsets.UTF_8));
+        assertThat(html).contains(
+                "<a class=\"rawnfo-link\" href=\"#\" data-rawnfo=\"" + base64
+                        + "\" data-title=\"Breaking Bad\">Raw data</a>");
+    }
+
+    @Test
+    void aShowWithoutRawNfoRendersAnEmptyCellWithNoLink() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+
+        String html = render("/shows");
+
+        assertThat(html).doesNotContain("rawnfo-link");
     }
 
     @Test
@@ -457,6 +480,17 @@ class ShowListingIT extends PostgresIntegrationTestBase {
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 title, 0, normalizedTitle, "UNKNOWN", new GenreList(List.of()).toStorage(), plot, slug);
+    }
+
+    private void insertShowWithRawNfo(String title, String rawNfo) {
+        String normalizedTitle = TitleNormalizer.normalize(title);
+        String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
+
+        jdbcTemplate.update("""
+                INSERT INTO show (title, year, normalized_title, status, genres, raw_nfo, slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                title, 0, normalizedTitle, "UNKNOWN", new GenreList(List.of()).toStorage(), rawNfo, slug);
     }
 
     private void insertShow(

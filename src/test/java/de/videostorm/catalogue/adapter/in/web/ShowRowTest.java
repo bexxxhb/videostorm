@@ -45,7 +45,7 @@ class ShowRowTest {
     void aPresentRatingAndStatusAreFormatted() {
         Show show = new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED,
                 Optional.of(new Rating("TVDB", new BigDecimal("9.5"))), GenreList.EMPTY, Optional.empty(),
-                5, 62, Optional.empty());
+                5, 62, Optional.empty(), Optional.empty());
 
         ShowRow row = ShowRow.from(show, 0);
 
@@ -57,7 +57,7 @@ class ShowRowTest {
     @Test
     void seasonAndEpisodeCountsAreRenderedAsStrings() {
         Show show = new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(),
-                GenreList.EMPTY, Optional.empty(), 5, 62, Optional.empty());
+                GenreList.EMPTY, Optional.empty(), 5, 62, Optional.empty(), Optional.empty());
 
         ShowRow row = ShowRow.from(show, 0);
 
@@ -99,7 +99,7 @@ class ShowRowTest {
 
     private static Show showWithImdbId(String imdbId) {
         return new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(), GenreList.EMPTY,
-                Optional.empty(), 5, 62, Optional.of(imdbId));
+                Optional.empty(), 5, 62, Optional.of(imdbId), Optional.empty());
     }
 
     @Test
@@ -130,7 +130,38 @@ class ShowRowTest {
 
     private static Show showWithPlot(String plot) {
         return new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(), GenreList.EMPTY,
-                Optional.of(plot), 5, 62, Optional.empty());
+                Optional.of(plot), 5, 62, Optional.empty(), Optional.empty());
+    }
+
+    @Test
+    void anAbsentRawNfoHasNoLinkAndAnEmptyBase64() {
+        ShowRow row = ShowRow.from(minimalShow(), 0);
+
+        assertThat(row.isHasRawNfo()).isFalse();
+        assertThat(row.getRawNfoBase64()).isEmpty();
+    }
+
+    @Test
+    void aBlankRawNfoIsTreatedAsAbsent() {
+        ShowRow row = ShowRow.from(showWithRawNfo("   "), 0);
+
+        assertThat(row.isHasRawNfo()).isFalse();
+        assertThat(row.getRawNfoBase64()).isEmpty();
+    }
+
+    @Test
+    void aPresentRawNfoIsExposedAsUtf8Base64() {
+        String rawNfo = "<tvshow>\n  <title>Breaking Bad</title>\n  <plot>L'été & \"foes\"</plot>\n</tvshow>";
+
+        ShowRow row = ShowRow.from(showWithRawNfo(rawNfo), 0);
+
+        assertThat(row.isHasRawNfo()).isTrue();
+        assertThat(decode(row.getRawNfoBase64())).isEqualTo(rawNfo);
+    }
+
+    private static Show showWithRawNfo(String rawNfo) {
+        return new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(), GenreList.EMPTY,
+                Optional.empty(), 5, 62, Optional.empty(), Optional.of(rawNfo));
     }
 
     private static String decode(String base64) {
@@ -139,6 +170,6 @@ class ShowRowTest {
 
     private static Show minimalShow() {
         return new Show(1, "Unscraped Folder", Year.UNKNOWN, ShowStatus.UNKNOWN, Optional.empty(), GenreList.EMPTY,
-                Optional.empty(), 0, 0, Optional.empty());
+                Optional.empty(), 0, 0, Optional.empty(), Optional.empty());
     }
 }

@@ -22,6 +22,7 @@ block content
           a.sort-link(href=sort.resolution.url) Resolution !{sort.resolution.marker}
         th Plot
         th IMDb
+        th nfo raw
     tbody
       each movie in movies
         tr(class=movie.rowClass)
@@ -37,6 +38,9 @@ block content
           td
             if movie.imdbUrl
               a.imdb-link(href=movie.imdbUrl)= movie.imdbLinkText
+          td
+            if movie.hasRawNfo
+              a.rawnfo-link(href="#", data-rawnfo=movie.rawNfoBase64, data-title=movie.title) Raw data
 
   nav.pagination
     if pagination.firstPageUrl
