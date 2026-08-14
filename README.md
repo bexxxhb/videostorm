@@ -18,6 +18,17 @@ Overridable via the environment (or a `.env` file): `POSTGRES_DB`, `POSTGRES_USE
 `admin` / `changeme`) — the login for the `/maintenance` area, BCrypted once at startup and never
 logged. Change the admin credentials for anything beyond local use.
 
+### Operating mode
+
+`APPLICATION_OPERATING_MODE` (`application.operating.mode`) selects what is reachable, switchable
+purely via `.env` with no rebuild:
+
+- `presentation` — view-only, and the **default** when unset: the maintenance area and login are
+  disabled and hidden. `MaintenanceController` and `LoginController` are not registered, the
+  security filter chain denies `/maintenance**` and `/login`, and the Maintenance nav link is not
+  rendered. The admin credentials above are then unused.
+- `maintenance` — full behaviour: the maintenance pages/actions and the login are available.
+
 ### Source paths and mounts
 
 The library lives behind read-only bind mounts. Point the host paths at your library and, if the
@@ -46,9 +57,10 @@ Unit and web-slice tests (`*Test`) need no database.
 
 Running the application outside of compose expects PostgreSQL on `localhost:5432` with database,
 user and password all set to `videostorm`; override with the usual `SPRING_DATASOURCE_*`
-properties. It also needs `VIDEOSTORM_ADMIN_USERNAME` and `VIDEOSTORM_ADMIN_PASSWORD` in the
-environment (or `videostorm.admin.username` / `videostorm.admin.password` as JVM properties) —
-startup fails, naming the missing one, if either is absent.
+properties. In `maintenance` mode it also needs `VIDEOSTORM_ADMIN_USERNAME` and
+`VIDEOSTORM_ADMIN_PASSWORD` in the environment (or `videostorm.admin.username` /
+`videostorm.admin.password` as JVM properties) — startup fails, naming the missing one, if either
+is absent. The default `presentation` mode has no login and does not require them.
 
 ## Layout
 
@@ -64,9 +76,11 @@ de.videostorm
 ├── VideostormApplication                   Spring Boot application entry point
 └── config
     ├── PugViewConfiguration                Wires the Pug4j template loader, config and view resolver into MVC
-    └── security
-        ├── AdminUserDetailsService         Supplies the single BCrypt-hashed admin account for the maintenance area
-        └── SecurityConfig                  Public catalogue, admin-gated maintenance, form login/logout
+    ├── security
+    │   ├── AdminUserDetailsService         Single BCrypt-hashed admin account; registered only in maintenance mode
+    │   └── SecurityConfig                  Public catalogue; gates/denies maintenance & login per operating mode
+    └── web
+        └── OperatingModeViewAdvice         Exposes the maintenanceEnabled flag to every page (hides the nav link)
 ```
 
 ### `sources` — configured source paths
@@ -97,25 +111,40 @@ catalogue
 │   ├── TitleNormalizer                     Lowercase, strip diacritics, collapse non-alphanumerics
 │   └── Year                                Release-year value object with explicit unknown (0) state
 ├── application
+│   ├── FetchMovieRawNfoService             Reads one movie's raw .nfo behind the inbound port
+│   ├── FetchShowRawNfoService              Reads one show's raw .nfo behind the inbound port
 │   ├── ListMoviesService                   Paginates and searches movies with page-clamping
 │   ├── ListShowsService                    Paginates and searches shows with page-clamping
 │   ├── MoviePage                           One page of movies with pagination metadata
+│   ├── MovieSort                           Active movie sort (field + direction), parsed safely from params
+│   ├── MovieSortField                      Whitelist of sortable movie columns; Title is the default/fallback
 │   ├── ShowPage                            One page of shows with pagination metadata
+│   ├── ShowSort                            Active show sort (field + direction), parsed safely from params
+│   ├── ShowSortField                       Whitelist of sortable show columns; Title is the default/fallback
+│   ├── SortDirection                       Sort direction ASC/DESC with its dir URL param; ASC default
 │   └── port
 │       ├── in
 │       │   ├── ListMoviesQuery             Inbound port for listing movies
-│       │   └── ListShowsQuery              Inbound port for listing shows
+│       │   ├── ListShowsQuery              Inbound port for listing shows
+│       │   ├── MovieRawNfoQuery            Inbound port for reading one movie's raw .nfo on demand
+│       │   └── ShowRawNfoQuery             Inbound port for reading one show's raw .nfo on demand
 │       └── out
 │           ├── MovieRepository             Outbound port for reading/counting movies
 │           └── ShowRepository              Outbound port for reading/counting shows
 └── adapter
     ├── in.web
     │   ├── MovieListingController          Public GET controller rendering the movie listing page
+    │   ├── MovieRawNfoController           Serves one movie's raw .nfo on demand as plain text; 404 when absent
     │   ├── MovieRow                        Display-ready JavaBean adapting a Movie for the template
+    │   ├── MovieSortView                   Per-column SortHeaders plus the active sort as params for the movies form
     │   ├── PaginationLinks                 Computes first/prev/next/last URLs preserving the query
     │   ├── ShowListingController           Public GET controller rendering the show listing page
-    │   └── ShowRow                         Display-ready JavaBean adapting a Show for the template
+    │   ├── ShowRawNfoController            Serves one show's raw .nfo on demand as plain text; 404 when absent
+    │   ├── ShowRow                         Display-ready JavaBean adapting a Show for the template
+    │   ├── ShowSortView                    Per-column SortHeaders plus the active sort as params for the shows form
+    │   └── SortHeader                      One sortable column's toggle link and ▲/▼/↕ direction marker
     └── out.persistence
+        ├── ListingSort                     Builds the paging Sort: chosen column, nulls last, id tiebreak
         ├── MovieEntity                     JPA entity for the movie table (read path)
         ├── MovieJpaRepository              Spring Data repository with the shared movie search predicate
         ├── MovieRepositoryAdapter          Adapts the JPA repo to the port, escaping LIKE terms
@@ -136,6 +165,7 @@ indexing
 │   ├── EpisodeDuplicateGuard               Per-show guard skipping episodes duplicating a season+episode
 │   ├── EpisodeNumberParser                 Parses season/episode from a filename via ordered regexes
 │   ├── FeatureSelection                    Picks a folder's feature video by prefix/size/name; lists ignored
+│   ├── FeatureVideo                        Min-size rule (500 MB) separating a feature film from clips/samples
 │   ├── IndexingRun                         Immutable run aggregate with lifecycle transitions
 │   ├── ParsedEpisodeNumber                 Parsed season number and episode number
 │   ├── ParsedMovie                         Raw Emby movie fields from one .nfo (nullable, with absent())
@@ -143,6 +173,7 @@ indexing
 │   ├── ParsedShow                          Raw Emby show fields from one .nfo (nullable, with absent())
 │   ├── PremieredYear                       Extracts a four-digit year from the Emby premiered date, else 0
 │   ├── RecognizedVideo                     Recognized video extensions; tests whether a filename is video
+│   ├── Resolution                          Movie resolution lifted from the feature filename, normalised to e.g. 1080p
 │   ├── RunCounts                           Non-negative tally of entries found and indexed
 │   ├── RunGapSummary                       Counts title and year field gaps among a run's issues
 │   ├── RunIssue                            One questionable finding against a path, with per-type factories
@@ -210,12 +241,18 @@ maintenance
 └── adapter.in.web
     ├── CsrfViewAttributes                  Pushes the Spring Security CSRF token into the Pug4j model
     ├── IndexingRunView                     JavaBean view of a run with display strings for the template
-    ├── LoginController                     Serves /login with CSRF and a login-failed flag
-    └── MaintenanceController               Shows runs, triggers reindex, downloads a report CSV
+    ├── LoginController                     Serves /login with CSRF and a login-failed flag (maintenance mode only)
+    └── MaintenanceController               Shows runs, triggers reindex, downloads a report CSV (maintenance only)
 ```
 
-Templates live under `src/main/resources/templates` (`layout.pug`, `movies.pug`, `shows.pug`),
-with static assets in `src/main/resources/static`.
+The whole area is governed by the operating mode (see *Operating mode* under *Running it*): in the
+default `presentation` mode `MaintenanceController` and `LoginController` are not registered and
+their routes are denied, so nothing here is reachable; in `maintenance` mode it behaves as above.
+
+Templates live under `src/main/resources/templates` — `layout.pug` (the shared shell),
+`movies.pug` and `shows.pug` (public listings), and `login.pug` and `maintenance.pug` (the admin
+area, rendered only in `maintenance` mode) — with static assets (`css/`, `js/`) in
+`src/main/resources/static`.
 
 Schema changes are Flyway migrations under `src/main/resources/db/migration`. Hibernate never
 generates DDL.

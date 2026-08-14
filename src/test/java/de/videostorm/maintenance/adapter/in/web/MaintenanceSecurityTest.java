@@ -42,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({SecurityConfig.class, AdminUserDetailsService.class, PugViewConfiguration.class,
         SourcesConfiguration.class})
 @TestPropertySource(properties = {
+        "application.operating.mode=maintenance",
         "videostorm.admin.username=" + PostgresIntegrationTestBase.ADMIN_USERNAME,
         "videostorm.admin.password=" + PostgresIntegrationTestBase.ADMIN_PASSWORD
 })

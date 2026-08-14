@@ -1,6 +1,7 @@
 package de.videostorm.maintenance.adapter.in.web;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * Security's saved-request flow is what actually sends callers here.
  */
 @Controller
+@ConditionalOnProperty(name = "application.operating.mode", havingValue = "maintenance")
 public class LoginController {
 
     @GetMapping("/login")

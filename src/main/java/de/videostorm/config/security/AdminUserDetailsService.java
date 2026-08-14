@@ -1,6 +1,7 @@
 package de.videostorm.config.security;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Component;
  * login, which would otherwise null out the encoded password for every login that follows.
  */
 @Component
+@ConditionalOnProperty(name = "application.operating.mode", havingValue = "maintenance")
 public class AdminUserDetailsService implements UserDetailsService {
 
     private final String username;

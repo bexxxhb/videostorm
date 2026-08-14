@@ -31,6 +31,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-videostorm}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-videostorm}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-videostorm}
+      # 'presentation' (view-only default: maintenance & login disabled and hidden) or 'maintenance'
+      # (full behaviour). Switchable purely via .env - no image rebuild.
+      APPLICATION_OPERATING_MODE: ${APPLICATION_OPERATING_MODE:-presentation}
       # Change these for anything beyond local use - the maintenance login is only as good as this password.
       VIDEOSTORM_ADMIN_USERNAME: ${VIDEOSTORM_ADMIN_USERNAME:-admin}
       VIDEOSTORM_ADMIN_PASSWORD: ${VIDEOSTORM_ADMIN_PASSWORD:-changeme}

@@ -12,10 +12,13 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * sidecar removes it when the JVM exits. The {@code @Testcontainers} extension is not used
  * because it stops the container after each test class, paying the startup cost again.
  *
- * <p>Also supplies the admin credentials that {@code SecurityConfig} requires at startup, so
- * every full-context test boots without having to know about that requirement.
+ * <p>Also runs in {@code maintenance} operating mode with the admin credentials that
+ * {@code AdminUserDetailsService} then requires at startup, so every full-context test boots
+ * with the maintenance area available (its historical behaviour) without having to know about
+ * either requirement. A test of the default {@code presentation} mode overrides the property.
  */
 @TestPropertySource(properties = {
+        "application.operating.mode=maintenance",
         "videostorm.admin.username=" + PostgresIntegrationTestBase.ADMIN_USERNAME,
         "videostorm.admin.password=" + PostgresIntegrationTestBase.ADMIN_PASSWORD
 })
