@@ -10,7 +10,7 @@ import java.util.List;
  * headers, pagination links and search form can preserve it.
  */
 public record ShowPage(List<Show> shows, int pageNumber, int totalPages, long totalElements,
-                       String query, ShowSort sort) {
+                       String query, ShowSort sort, int pageSize) {
 
     public boolean hasPrevious() {
         return pageNumber > 1;
@@ -18,5 +18,13 @@ public record ShowPage(List<Show> shows, int pageNumber, int totalPages, long to
 
     public boolean hasNext() {
         return pageNumber < totalPages;
+    }
+
+    /**
+     * 1-based position of this page's first row within the full result set, so the listing can render
+     * a running index that continues across pages (page 2 starts at {@code pageSize + 1}).
+     */
+    public long firstItemNumber() {
+        return (long) (pageNumber - 1) * pageSize + 1;
     }
 }

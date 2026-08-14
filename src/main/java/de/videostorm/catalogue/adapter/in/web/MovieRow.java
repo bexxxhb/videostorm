@@ -24,6 +24,9 @@ public class MovieRow {
     private static final String ODD_ROW_CLASS = "row-odd";
     private static final String IMDB_LINK_TEXT = "info @ IMDB.com";
 
+    // 1-based running position in the full result set, precomputed as a string so the template renders
+    // the leftmost index cell without any arithmetic.
+    private final String indexDisplay;
     private final String rowClass;
     private final String title;
     private final String year;
@@ -45,10 +48,11 @@ public class MovieRow {
     private final boolean hasRawNfo;
     private final String rawNfoUrl;
 
-    static MovieRow from(Movie movie, int index) {
+    static MovieRow from(Movie movie, int index, long number) {
         Optional<String> plot = movie.plot().filter(text -> !text.isBlank());
         Optional<String> imdbId = movie.imdbId().filter(id -> !id.isBlank());
         return new MovieRow(
+                String.valueOf(number),
                 index % 2 == 0 ? EVEN_ROW_CLASS : ODD_ROW_CLASS,
                 movie.title(),
                 movie.year().isKnown() ? String.valueOf(movie.year().value()) : "",

@@ -49,7 +49,7 @@ class MovieListingControllerTest {
     private ListMoviesQuery listMoviesQuery;
 
     private static MoviePage emptyPage(int pageNumber, int totalPages, long total, String query, MovieSort sort) {
-        return new MoviePage(List.of(), pageNumber, totalPages, total, query, sort);
+        return new MoviePage(List.of(), pageNumber, totalPages, total, query, sort, 50);
     }
 
     @Test

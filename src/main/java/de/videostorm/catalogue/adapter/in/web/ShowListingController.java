@@ -35,8 +35,9 @@ public class ShowListingController {
         ShowPage showPage = listShowsQuery.list(page, query, showSort);
 
         List<Show> shows = showPage.shows();
+        long firstNumber = showPage.firstItemNumber();
         List<ShowRow> rows = IntStream.range(0, shows.size())
-                .mapToObj(index -> ShowRow.from(shows.get(index), index))
+                .mapToObj(index -> ShowRow.from(shows.get(index), index, firstNumber + index))
                 .toList();
 
         model.addAttribute("shows", rows);

@@ -18,27 +18,32 @@ class ShowRowTest {
 
     @Test
     void evenIndexGetsTheEvenRowClass() {
-        assertThat(ShowRow.from(minimalShow(), 0).getRowClass()).isEqualTo("row-even");
+        assertThat(ShowRow.from(minimalShow(), 0, 1).getRowClass()).isEqualTo("row-even");
     }
 
     @Test
     void oddIndexGetsTheOddRowClass() {
-        assertThat(ShowRow.from(minimalShow(), 1).getRowClass()).isEqualTo("row-odd");
+        assertThat(ShowRow.from(minimalShow(), 1, 2).getRowClass()).isEqualTo("row-odd");
+    }
+
+    @Test
+    void theRunningNumberIsExposedAsTheIndexDisplay() {
+        assertThat(ShowRow.from(minimalShow(), 0, 42).getIndexDisplay()).isEqualTo("42");
     }
 
     @Test
     void anUnknownYearRendersAsAnEmptyString() {
-        assertThat(ShowRow.from(minimalShow(), 0).getYear()).isEmpty();
+        assertThat(ShowRow.from(minimalShow(), 0, 1).getYear()).isEmpty();
     }
 
     @Test
     void anAbsentRatingRendersAsAnEmptyString() {
-        assertThat(ShowRow.from(minimalShow(), 0).getRatingDisplay()).isEmpty();
+        assertThat(ShowRow.from(minimalShow(), 0, 1).getRatingDisplay()).isEmpty();
     }
 
     @Test
     void anUnknownStatusRendersAsUnknown() {
-        assertThat(ShowRow.from(minimalShow(), 0).getStatusDisplay()).isEqualTo("unknown");
+        assertThat(ShowRow.from(minimalShow(), 0, 1).getStatusDisplay()).isEqualTo("unknown");
     }
 
     @Test
@@ -47,7 +52,7 @@ class ShowRowTest {
                 Optional.of(new Rating("TVDB", new BigDecimal("9.5"))), GenreList.EMPTY, Optional.empty(),
                 5, 62, Optional.empty(), false);
 
-        ShowRow row = ShowRow.from(show, 0);
+        ShowRow row = ShowRow.from(show, 0, 1);
 
         assertThat(row.getYear()).isEqualTo("2008");
         assertThat(row.getStatusDisplay()).isEqualTo("ended");
@@ -59,7 +64,7 @@ class ShowRowTest {
         Show show = new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(),
                 GenreList.EMPTY, Optional.empty(), 5, 62, Optional.empty(), false);
 
-        ShowRow row = ShowRow.from(show, 0);
+        ShowRow row = ShowRow.from(show, 0, 1);
 
         assertThat(row.getSeasonsDisplay()).isEqualTo("5");
         assertThat(row.getEpisodesDisplay()).isEqualTo("62");
@@ -67,7 +72,7 @@ class ShowRowTest {
 
     @Test
     void aShowWithNoEpisodesRendersZeroSeasonsAndZeroEpisodes() {
-        ShowRow row = ShowRow.from(minimalShow(), 0);
+        ShowRow row = ShowRow.from(minimalShow(), 0, 1);
 
         assertThat(row.getSeasonsDisplay()).isEqualTo("0");
         assertThat(row.getEpisodesDisplay()).isEqualTo("0");
@@ -75,7 +80,7 @@ class ShowRowTest {
 
     @Test
     void anAbsentImdbIdLeavesBothTheUrlAndLinkTextEmpty() {
-        ShowRow row = ShowRow.from(minimalShow(), 0);
+        ShowRow row = ShowRow.from(minimalShow(), 0, 1);
 
         assertThat(row.getImdbUrl()).isEmpty();
         assertThat(row.getImdbLinkText()).isEmpty();
@@ -83,7 +88,7 @@ class ShowRowTest {
 
     @Test
     void aBlankImdbIdIsTreatedAsAbsent() {
-        ShowRow row = ShowRow.from(showWithImdbId("   "), 0);
+        ShowRow row = ShowRow.from(showWithImdbId("   "), 0, 1);
 
         assertThat(row.getImdbUrl()).isEmpty();
         assertThat(row.getImdbLinkText()).isEmpty();
@@ -91,7 +96,7 @@ class ShowRowTest {
 
     @Test
     void aPresentImdbIdBuildsTheTitleUrlAndTheFixedLinkText() {
-        ShowRow row = ShowRow.from(showWithImdbId("tt0903747"), 0);
+        ShowRow row = ShowRow.from(showWithImdbId("tt0903747"), 0, 1);
 
         assertThat(row.getImdbUrl()).isEqualTo("https://www.imdb.com/title/tt0903747/");
         assertThat(row.getImdbLinkText()).isEqualTo("info @ IMDB.com");
@@ -104,7 +109,7 @@ class ShowRowTest {
 
     @Test
     void anAbsentPlotHasNoLinkAndAnEmptyBase64() {
-        ShowRow row = ShowRow.from(minimalShow(), 0);
+        ShowRow row = ShowRow.from(minimalShow(), 0, 1);
 
         assertThat(row.isHasPlot()).isFalse();
         assertThat(row.getPlotBase64()).isEmpty();
@@ -112,7 +117,7 @@ class ShowRowTest {
 
     @Test
     void aBlankPlotIsTreatedAsAbsent() {
-        ShowRow row = ShowRow.from(showWithPlot("   "), 0);
+        ShowRow row = ShowRow.from(showWithPlot("   "), 0, 1);
 
         assertThat(row.isHasPlot()).isFalse();
         assertThat(row.getPlotBase64()).isEmpty();
@@ -122,7 +127,7 @@ class ShowRowTest {
     void aPresentPlotIsExposedAsUtf8Base64() {
         String plot = "L'été: a \"tale\" of <heroes> & foes.\nSecond line.";
 
-        ShowRow row = ShowRow.from(showWithPlot(plot), 0);
+        ShowRow row = ShowRow.from(showWithPlot(plot), 0, 1);
 
         assertThat(row.isHasPlot()).isTrue();
         assertThat(decode(row.getPlotBase64())).isEqualTo(plot);
@@ -135,7 +140,7 @@ class ShowRowTest {
 
     @Test
     void aShowWithoutRawNfoHasNoLinkAndAnEmptyUrl() {
-        ShowRow row = ShowRow.from(minimalShow(), 0);
+        ShowRow row = ShowRow.from(minimalShow(), 0, 1);
 
         assertThat(row.isHasRawNfo()).isFalse();
         assertThat(row.getRawNfoUrl()).isEmpty();
@@ -143,7 +148,7 @@ class ShowRowTest {
 
     @Test
     void aShowWithRawNfoLinksToItsOnDemandNfoEndpoint() {
-        ShowRow row = ShowRow.from(showWithRawNfo(), 0);
+        ShowRow row = ShowRow.from(showWithRawNfo(), 0, 1);
 
         assertThat(row.isHasRawNfo()).isTrue();
         assertThat(row.getRawNfoUrl()).isEqualTo("/shows/1/nfo");

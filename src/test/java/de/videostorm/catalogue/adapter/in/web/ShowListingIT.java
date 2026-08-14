@@ -59,6 +59,7 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         String html = render("/shows");
 
         assertThat(html)
+                .contains("<th>#</th>")
                 .contains(">Title " + SortHeader.ASC_MARKER + "</a>")
                 .contains(">Started " + SortHeader.NEUTRAL_MARKER + "</a>")
                 .contains(">Rating " + SortHeader.NEUTRAL_MARKER + "</a>")
@@ -359,6 +360,8 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         String html = render("/shows?page=2");
 
         assertThat(html).contains("Page 2 of 3");
+        // The running index continues across pages: page 2's first row (the 51st show) is numbered 51.
+        assertThat(html).contains("<td>51</td>");
         assertThat(html).contains("<td>Show 051</td>");
         assertThat(html).contains("<td>Show 100</td>");
         assertThat(html).doesNotContain("<td>Show 001</td>");

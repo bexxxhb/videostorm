@@ -49,7 +49,7 @@ class ShowListingControllerTest {
     private ListShowsQuery listShowsQuery;
 
     private static ShowPage emptyPage(int pageNumber, int totalPages, long total, String query, ShowSort sort) {
-        return new ShowPage(List.of(), pageNumber, totalPages, total, query, sort);
+        return new ShowPage(List.of(), pageNumber, totalPages, total, query, sort, 50);
     }
 
     @Test

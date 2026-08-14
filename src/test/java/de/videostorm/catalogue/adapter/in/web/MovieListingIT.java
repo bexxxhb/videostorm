@@ -57,6 +57,7 @@ class MovieListingIT extends PostgresIntegrationTestBase {
 
         // Sortable columns render as links; the rest stay plain.
         assertThat(html)
+                .contains("<th>#</th>")
                 .contains(">Title " + SortHeader.ASC_MARKER + "</a>")
                 .contains(">Year " + SortHeader.NEUTRAL_MARKER + "</a>")
                 .contains(">Rating " + SortHeader.NEUTRAL_MARKER + "</a>")
@@ -345,6 +346,8 @@ class MovieListingIT extends PostgresIntegrationTestBase {
         String html = render("/movies?page=2");
 
         assertThat(html).contains("Page 2 of 3");
+        // The running index continues across pages: page 2's first row (the 51st movie) is numbered 51.
+        assertThat(html).contains("<td>51</td>");
         assertThat(html).contains("<td>Movie 051</td>");
         assertThat(html).contains("<td>Movie 100</td>");
         assertThat(html).doesNotContain("<td>Movie 001</td>");

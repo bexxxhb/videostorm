@@ -35,8 +35,9 @@ public class MovieListingController {
         MoviePage moviePage = listMoviesQuery.list(page, query, movieSort);
 
         List<Movie> movies = moviePage.movies();
+        long firstNumber = moviePage.firstItemNumber();
         List<MovieRow> rows = IntStream.range(0, movies.size())
-                .mapToObj(index -> MovieRow.from(movies.get(index), index))
+                .mapToObj(index -> MovieRow.from(movies.get(index), index, firstNumber + index))
                 .toList();
 
         model.addAttribute("movies", rows);

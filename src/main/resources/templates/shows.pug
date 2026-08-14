@@ -10,6 +10,7 @@ block content
   table.catalogue
     thead
       tr
+        th #
         th
           a.sort-link(href=sort.title.url) Title !{sort.title.marker}
         th
@@ -26,6 +27,7 @@ block content
     tbody
       each show in shows
         tr(class=show.rowClass)
+          td= show.indexDisplay
           td= show.title
           td= show.year
           td= show.statusDisplay

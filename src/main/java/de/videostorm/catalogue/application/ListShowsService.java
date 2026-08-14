@@ -24,7 +24,7 @@ class ListShowsService implements ListShowsQuery {
         int totalPages = totalElements == 0 ? 1 : (int) Math.ceil((double) totalElements / PAGE_SIZE);
         int pageNumber = clamp(requestedPage, totalPages);
         List<Show> shows = showRepository.findPage(searchTerm, sort, pageNumber, PAGE_SIZE);
-        return new ShowPage(shows, pageNumber, totalPages, totalElements, searchTerm.raw(), sort);
+        return new ShowPage(shows, pageNumber, totalPages, totalElements, searchTerm.raw(), sort, PAGE_SIZE);
     }
 
     private static int clamp(int requestedPage, int totalPages) {
