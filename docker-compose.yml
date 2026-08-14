@@ -42,8 +42,24 @@ services:
       VIDEOSTORM_SOURCES_SHOWS: ${VIDEOSTORM_SOURCES_SHOWS:-/media/shows}
     volumes:
       # The library is bind-mounted read-only: the catalogue can never modify or delete it.
-      - ${VIDEOSTORM_MOVIES_HOST:-./media/movies}:/media/movies:ro
-      - ${VIDEOSTORM_SHOWS_HOST:-./media/shows}:/media/shows:ro
+      #
+      # Point these at the NAS MOUNT POINTS (host dirs that exist even when the share is offline),
+      # not at paths inside the share. A mount point stays present-but-empty while its NAS is down,
+      # so the bind source always exists and the container always starts; the app then aborts a
+      # re-index instead of wiping the catalogue. 'propagation: rslave' surfaces the share inside
+      # the container when the NAS (re)mounts on the host after the container has already started.
+      # 'create_host_path: false' stops Compose fabricating an empty stub that would mask an
+      # offline share.
+      - type: bind
+        source: ${VIDEOSTORM_MOVIES_HOST:-./media/movies}
+        target: /media/movies
+        read_only: true
+        bind: { create_host_path: false, propagation: rslave }
+      - type: bind
+        source: ${VIDEOSTORM_SHOWS_HOST:-./media/shows}
+        target: /media/shows
+        read_only: true
+        bind: { create_host_path: false, propagation: rslave }
     ports:
       - "8080:8080"
     restart: unless-stopped

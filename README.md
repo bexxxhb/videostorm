@@ -36,6 +36,13 @@ container process needs a specific identity to read them, set the uid and gid:
 
 - `VIDEOSTORM_MOVIES_HOST` / `VIDEOSTORM_SHOWS_HOST` — host directories to mount (default
   `./media/movies`, `./media/shows`), mounted read-only at `/media/movies` and `/media/shows`.
+  For a network library (NAS/SMB/NFS), point these at the **mount points** — the host directories
+  the shares mount onto — not at paths inside the shares. A mount point stays present-but-empty
+  while its share is offline, so the container still starts; the compose mounts use
+  `create_host_path: false` (no masking stub is fabricated) and `propagation: rslave` (a share that
+  (re)mounts on the host after the container started surfaces inside it). When a share is absent the
+  container sees an empty directory and a re-index aborts without touching the catalogue, rather
+  than the daemon refusing to start the container.
 - `VIDEOSTORM_SOURCES_MOVIES` / `VIDEOSTORM_SOURCES_SHOWS` — comma-separated absolute paths the
   application indexes, **inside** the container; they must match the mounts (default
   `/media/movies`, `/media/shows`). Entries are trimmed and normalised; startup fails, naming the
