@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -54,16 +55,22 @@ class ShowListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void rendersEveryShowColumnHeader() throws Exception {
+    void rendersEveryShowColumnHeaderWithSortableOnesAsLinksAndNoResolution() throws Exception {
         String html = render("/shows");
 
         assertThat(html)
-                .contains("<th>Title</th>")
-                .contains("<th>Year</th>")
+                .contains("<th>#</th>")
+                .contains(">Title " + SortHeader.ASC_MARKER + "</a>")
+                .contains(">Started " + SortHeader.NEUTRAL_MARKER + "</a>")
+                .contains(">Rating " + SortHeader.NEUTRAL_MARKER + "</a>")
                 .contains("<th>Status</th>")
-                .contains("<th>Rating</th>")
                 .contains("<th>Genres</th>")
-                .contains("<th>Plot</th>");
+                .contains("<th>Seasons</th>")
+                .contains("<th>Total Episodes</th>")
+                .contains("<th>Plot</th>")
+                .contains("<th>IMDb</th>")
+                .contains("<th>nfo raw</th>")
+                .doesNotContain("Resolution");
     }
 
     @Test
@@ -88,6 +95,50 @@ class ShowListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
+    void aShowWithRawNfoRendersARawDataLinkToItsOnDemandNfoEndpoint() throws Exception {
+        long id = insertShowWithRawNfo("Breaking Bad", "<tvshow><title>Breaking Bad</title></tvshow>");
+
+        String html = render("/shows");
+
+        assertThat(html).contains(
+                "<a class=\"rawnfo-link\" href=\"/shows/" + id + "/nfo\" data-title=\"Breaking Bad\">Raw data</a>");
+    }
+
+    @Test
+    void aShowWithoutRawNfoRendersAnEmptyCellWithNoLink() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+
+        String html = render("/shows");
+
+        assertThat(html).doesNotContain("rawnfo-link");
+    }
+
+    @Test
+    void theRawNfoEndpointServesTheStoredXmlVerbatim() throws Exception {
+        String rawNfo = "<tvshow>\n  <title>Breaking Bad</title>\n  <plot>L'été & \"foes\"</plot>\n</tvshow>";
+        long id = insertShowWithRawNfo("Breaking Bad", rawNfo);
+
+        mockMvc.perform(get("/shows/" + id + "/nfo"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(rawNfo));
+    }
+
+    @Test
+    void theRawNfoEndpointReturns404ForAnUnknownShow() throws Exception {
+        mockMvc.perform(get("/shows/999999/nfo")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void theRawNfoEndpointReturns404WhenTheShowHasNoRawNfo() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+        Long id = jdbcTemplate.queryForObject(
+                "SELECT id FROM show WHERE normalized_title = ?", Long.class,
+                TitleNormalizer.normalize("Unscraped Folder"));
+
+        mockMvc.perform(get("/shows/" + id + "/nfo")).andExpect(status().isNotFound());
+    }
+
+    @Test
     void rendersAnEmptyTableWhenNothingIsCatalogued() throws Exception {
         String html = render("/shows");
 
@@ -107,6 +158,57 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         assertThat(html).contains("<td>ended</td>");
         assertThat(html).contains("<td>9.5 (TVDB)</td>");
         assertThat(html).contains("<td title=\"Crime, Drama\">Crime, Drama</td>");
+    }
+
+    @Test
+    void showsTheDistinctSeasonCountAndTotalEpisodeCount() throws Exception {
+        insertShow("Breaking Bad", 2008, "ENDED", null, null, List.of());
+        long showId = idOf("Breaking Bad");
+        insertEpisode(showId, 1, 1);
+        insertEpisode(showId, 1, 2);
+        insertEpisode(showId, 2, 1);
+
+        String html = render("/shows");
+
+        // Title, Started, Status, Rating(empty), Genres(empty), Seasons(2), Total Episodes(3).
+        assertThat(html).contains(
+                "<td>Breaking Bad</td><td>2008</td><td>ended</td><td></td><td title=\"\"></td><td>2</td><td>3</td>");
+    }
+
+    @Test
+    void aShowWithNoEpisodesRendersZeroSeasonsAndZeroEpisodes() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+
+        String html = render("/shows");
+
+        assertThat(html).contains(
+                "<td>Unscraped Folder</td><td></td><td>unknown</td><td></td><td title=\"\"></td><td>0</td><td>0</td>");
+    }
+
+    @Test
+    void aShowWithAnImdbIdRendersALinkToItsImdbPage() throws Exception {
+        insertShowWithImdb("Breaking Bad", "tt0903747");
+
+        String html = render("/shows");
+
+        assertThat(html).contains(
+                "<a class=\"imdb-link\" href=\"https://www.imdb.com/title/tt0903747/\">info @ IMDB.com</a>");
+    }
+
+    @Test
+    void aShowWithoutAnImdbIdRendersAnEmptyImdbCellWithNoLink() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+
+        String html = render("/shows");
+
+        assertThat(html).doesNotContain("imdb-link");
+    }
+
+    @Test
+    void theMoviesPageLabelsItsYearColumnYearNotStarted() throws Exception {
+        String html = render("/movies");
+
+        assertThat(html).contains(">Year " + SortHeader.NEUTRAL_MARKER + "</a>").doesNotContain("Started");
     }
 
     @Test
@@ -178,17 +280,45 @@ class ShowListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void tiesBreakDeterministicallyOnYearThenId() throws Exception {
-        insertShow("The Thing", 2011, "UNKNOWN", null, null, List.of());
+    void tiesOnTheSortedColumnBreakDeterministicallyOnId() throws Exception {
+        insertShow("The Thing", 2011, "UNKNOWN", null, null, List.of()); // inserted first, so lower id
         insertShow("The Thing", 1982, "UNKNOWN", null, null, List.of());
 
         String html = render("/shows");
 
-        int earlier = html.indexOf("<td>1982</td>");
-        int later = html.indexOf("<td>2011</td>");
+        int first = html.indexOf("<td>2011</td>");
+        int second = html.indexOf("<td>1982</td>");
 
-        assertThat(earlier).isPositive();
-        assertThat(later).isGreaterThan(earlier);
+        assertThat(first).isPositive();
+        assertThat(second).isGreaterThan(first);
+    }
+
+    @Test
+    void sortsByStartedYearAscendingWithUnknownYearsLast() throws Exception {
+        insertShow("Old Show", 1980, "UNKNOWN", null, null, List.of());
+        insertShow("New Show", 2020, "UNKNOWN", null, null, List.of());
+        insertShow("Undated Show", null, "UNKNOWN", null, null, List.of()); // year sentinel 0
+
+        String html = render("/shows?sort=year&dir=asc");
+
+        assertThat(indexOf(html, "Old Show"))
+                .isLessThan(indexOf(html, "New Show"))
+                .isLessThan(indexOf(html, "Undated Show"));
+        assertThat(indexOf(html, "New Show")).isLessThan(indexOf(html, "Undated Show"));
+    }
+
+    @Test
+    void sortsByRatingDescendingWithUnratedShowsLast() throws Exception {
+        insertShow("Lower Rated", 2000, "UNKNOWN", "TVDB", new BigDecimal("6.1"), List.of());
+        insertShow("Higher Rated", 2000, "UNKNOWN", "TVDB", new BigDecimal("9.2"), List.of());
+        insertShow("Unrated", 2000, "UNKNOWN", null, null, List.of());
+
+        String html = render("/shows?sort=rating&dir=desc");
+
+        assertThat(indexOf(html, "Higher Rated"))
+                .isLessThan(indexOf(html, "Lower Rated"))
+                .isLessThan(indexOf(html, "Unrated"));
+        assertThat(indexOf(html, "Lower Rated")).isLessThan(indexOf(html, "Unrated"));
     }
 
     @Test
@@ -201,8 +331,8 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         assertThat(html).contains("120 total");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">First</span>");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">Previous</span>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=2\">Next</a>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=3\">Last</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=2&amp;sort=title&amp;dir=asc\">Next</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=3&amp;sort=title&amp;dir=asc\">Last</a>");
         assertThat(html).contains("<td>Show 001</td>");
         assertThat(html).contains("<td>Show 050</td>");
         assertThat(html).doesNotContain("<td>Show 051</td>");
@@ -217,8 +347,8 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         assertThat(html).contains("Page 3 of 3");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">Next</span>");
         assertThat(html).containsPattern("<span class=\"pagination__link pagination__link--disabled\">Last</span>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=1\">First</a>");
-        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=2\">Previous</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=1&amp;sort=title&amp;dir=asc\">First</a>");
+        assertThat(html).contains("<a class=\"pagination__link\" href=\"/shows?page=2&amp;sort=title&amp;dir=asc\">Previous</a>");
         assertThat(html).contains("<td>Show 101</td>");
         assertThat(html).contains("<td>Show 120</td>");
     }
@@ -230,6 +360,8 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         String html = render("/shows?page=2");
 
         assertThat(html).contains("Page 2 of 3");
+        // The running index continues across pages: page 2's first row (the 51st show) is numbered 51.
+        assertThat(html).contains("<td>51</td>");
         assertThat(html).contains("<td>Show 051</td>");
         assertThat(html).contains("<td>Show 100</td>");
         assertThat(html).doesNotContain("<td>Show 001</td>");
@@ -308,7 +440,7 @@ class ShowListingIT extends PostgresIntegrationTestBase {
 
         assertThat(html).contains("Page 1 of 2");
         assertThat(html).contains("60 total");
-        assertThat(html).contains("href=\"/shows?page=2&amp;q=batman\"");
+        assertThat(html).contains("href=\"/shows?page=2&amp;q=batman&amp;sort=title&amp;dir=asc\"");
     }
 
     @Test
@@ -326,6 +458,12 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         assertThat(moviesHtml).contains("<td>Movie Only</td>");
     }
 
+    private static int indexOf(String html, String title) {
+        int index = html.indexOf("<td>" + title + "</td>");
+        assertThat(index).as("row for %s", title).isGreaterThanOrEqualTo(0);
+        return index;
+    }
+
     private void seedShows(int count) {
         for (int i = 1; i <= count; i++) {
             insertShow(String.format("Show %03d", i), 2000, "UNKNOWN", null, null, List.of());
@@ -338,6 +476,27 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         insertShow(title, null, year, status, ratingSource, ratingValue, genreValues);
     }
 
+    private long idOf(String title) {
+        return jdbcTemplate.queryForObject("SELECT id FROM show WHERE title = ?", Long.class, title);
+    }
+
+    private void insertEpisode(long showId, int seasonNumber, int episodeNumber) {
+        jdbcTemplate.update(
+                "INSERT INTO episode (show_id, season_number, episode_number) VALUES (?, ?, ?)",
+                showId, seasonNumber, episodeNumber);
+    }
+
+    private void insertShowWithImdb(String title, String imdbId) {
+        String normalizedTitle = TitleNormalizer.normalize(title);
+        String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
+
+        jdbcTemplate.update("""
+                INSERT INTO show (title, year, normalized_title, status, genres, imdb_id, slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                title, 0, normalizedTitle, "UNKNOWN", new GenreList(List.of()).toStorage(), imdbId, slug);
+    }
+
     private void insertShowWithPlot(String title, String plot) {
         String normalizedTitle = TitleNormalizer.normalize(title);
         String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
@@ -347,6 +506,18 @@ class ShowListingIT extends PostgresIntegrationTestBase {
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 title, 0, normalizedTitle, "UNKNOWN", new GenreList(List.of()).toStorage(), plot, slug);
+    }
+
+    private long insertShowWithRawNfo(String title, String rawNfo) {
+        String normalizedTitle = TitleNormalizer.normalize(title);
+        String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
+
+        jdbcTemplate.update("""
+                INSERT INTO show (title, year, normalized_title, status, genres, raw_nfo, slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                title, 0, normalizedTitle, "UNKNOWN", new GenreList(List.of()).toStorage(), rawNfo, slug);
+        return jdbcTemplate.queryForObject("SELECT id FROM show WHERE slug = ?", Long.class, slug);
     }
 
     private void insertShow(

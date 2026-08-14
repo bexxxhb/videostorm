@@ -16,6 +16,20 @@ public record RunGapSummary(int titleGaps, int yearGaps) {
         return new RunGapSummary(0, 0);
     }
 
+    /**
+     * The number of distinct catalogued entries (by {@link RunIssue#path()}) that {@code issues} records
+     * at least one {@link RunIssueType#MISSING_FIELD} against — the per-run "missing data" counter. An
+     * entry thin in both its title and its year is counted once, and every other kind of issue (skips,
+     * duplicates, missing/ignored videos, unparseable episodes) is ignored.
+     */
+    public static int distinctMissingDataEntries(List<RunIssue> issues) {
+        return (int) issues.stream()
+                .filter(issue -> issue.type() == RunIssueType.MISSING_FIELD)
+                .map(RunIssue::path)
+                .distinct()
+                .count();
+    }
+
     /** Tallies the title and year field gaps among {@code issues}, ignoring every other issue. */
     public static RunGapSummary from(List<RunIssue> issues) {
         int titleGaps = 0;

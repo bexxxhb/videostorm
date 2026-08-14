@@ -12,5 +12,6 @@ public record Movie(
         Optional<Integer> runtimeMinutes,
         Optional<String> resolution,
         Optional<String> imdbId,
-        Optional<String> plot) {
+        Optional<String> plot,
+        boolean hasRawNfo) {
 }

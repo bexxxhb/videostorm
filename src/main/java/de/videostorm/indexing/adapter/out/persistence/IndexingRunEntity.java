@@ -39,4 +39,10 @@ class IndexingRunEntity {
 
     @Column(name = "entries_indexed")
     private int entriesIndexed;
+
+    @Column(name = "entries_skipped")
+    private int entriesSkipped;
+
+    @Column(name = "entries_missing_data")
+    private int entriesMissingData;
 }

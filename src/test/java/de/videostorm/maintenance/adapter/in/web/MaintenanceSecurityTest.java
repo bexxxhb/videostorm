@@ -42,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Import({SecurityConfig.class, AdminUserDetailsService.class, PugViewConfiguration.class,
         SourcesConfiguration.class})
 @TestPropertySource(properties = {
+        "application.operating.mode=maintenance",
         "videostorm.admin.username=" + PostgresIntegrationTestBase.ADMIN_USERNAME,
         "videostorm.admin.password=" + PostgresIntegrationTestBase.ADMIN_PASSWORD
 })
@@ -76,6 +77,13 @@ class MaintenanceSecurityTest {
     @Test
     void theLoginPageIsReachableDirectlyWithoutAuthentication() throws Exception {
         mockMvc.perform(get("/login")).andExpect(status().isOk());
+    }
+
+    @Test
+    void staticJavaScriptIsServedPubliclySoThePlotDialogWiresUp() throws Exception {
+        // The plot/raw-data dialog only opens if /js/content-dialog.js loads; without /js/** permitted
+        // the filter chain redirects the unauthenticated request to /login and the script never runs.
+        mockMvc.perform(get("/js/content-dialog.js")).andExpect(status().isOk());
     }
 
     @Test

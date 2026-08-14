@@ -18,13 +18,13 @@ class ListMoviesService implements ListMoviesQuery {
     private final MovieRepository movieRepository;
 
     @Override
-    public MoviePage list(int requestedPage, String query) {
+    public MoviePage list(int requestedPage, String query, MovieSort sort) {
         SearchTerm searchTerm = new SearchTerm(query);
         long totalElements = movieRepository.count(searchTerm);
         int totalPages = totalElements == 0 ? 1 : (int) Math.ceil((double) totalElements / PAGE_SIZE);
         int pageNumber = clamp(requestedPage, totalPages);
-        List<Movie> movies = movieRepository.findPage(searchTerm, pageNumber, PAGE_SIZE);
-        return new MoviePage(movies, pageNumber, totalPages, totalElements, searchTerm.raw());
+        List<Movie> movies = movieRepository.findPage(searchTerm, sort, pageNumber, PAGE_SIZE);
+        return new MoviePage(movies, pageNumber, totalPages, totalElements, searchTerm.raw(), sort, PAGE_SIZE);
     }
 
     private static int clamp(int requestedPage, int totalPages) {

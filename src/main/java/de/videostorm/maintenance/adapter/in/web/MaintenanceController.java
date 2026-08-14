@@ -9,6 +9,7 @@ import de.videostorm.indexing.domain.RunGapSummary;
 import de.videostorm.sources.domain.SourcePaths;
 import de.videostorm.sources.domain.SourceType;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -43,6 +44,7 @@ import java.util.Set;
  * the triggering administrator is told which mounts to fix, and only they, since the page is gated.
  */
 @Controller
+@ConditionalOnProperty(name = "application.operating.mode", havingValue = "maintenance")
 public class MaintenanceController {
 
     private static final int META_REFRESH_SECONDS = 3;

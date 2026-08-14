@@ -18,7 +18,7 @@ Also we will create a frontend application to present the stored informations.
 
 ## Unit tests
 - Test domain logic in isolation
-- Mock external depedencies
+- Mock external dependencies
 - Focus on business rules and invariants
   
 ## Plan Mode
@@ -26,5 +26,17 @@ Also we will create a frontend application to present the stored informations.
 - Make the plan extremely concise. Sacrifice grammar for the sake of concision.
 - At the end of each plan, give me a list of unresolved questions to answer, if any.
 
+## Agent skills
 
-see `.claude/rules/` for additional specific rules
+### Issue tracker
+
+Issues live in GitHub Issues for `bexxxhb/videostorm`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+## Mandantory implementation restrictions
+
+- DO NOT print output of any Unit- or IT-Run into the session window
+- DO NOT print any ( code base ) directory listings into the session window.
+- If necessary work with temporary files in the ( temporary ) project directory ( /Users/marcelklaas/.claude/projects/-Users-marcelklaas-devp-videostorm/ ) 
+- DO NOT output complete files unless explicitly requested. Use brief code snippets for changes
+- DO NOT output changed lines in code files into the session window
+- DO NOT output bash command output into the session window

@@ -106,14 +106,15 @@ body {
     color: var(--rule);
 }
 
-.plot-link {
+.plot-link,
+.rawnfo-link {
     color: var(--accent);
     cursor: pointer;
 }
 
 /* Padding lives on the panel, not the dialog, so a click anywhere off the panel lands on the
-   dialog element itself and is treated as a backdrop click (see plot-dialog.js). */
-.plot-dialog {
+   dialog element itself and is treated as a backdrop click (see content-dialog.js). */
+.content-dialog {
     padding: 0;
     border: 1px solid var(--rule);
     max-width: 40rem;
@@ -122,15 +123,20 @@ body {
     background: #fff;
 }
 
-.plot-dialog::backdrop {
+/* Raw .nfo XML needs the room; the body scrolls on both axes so long files never overflow. */
+.content-dialog--wide {
+    max-width: 60rem;
+}
+
+.content-dialog::backdrop {
     background: rgba(0, 0, 0, 0.4);
 }
 
-.plot-dialog__panel {
+.content-dialog__panel {
     padding: 1.25rem 1.5rem;
 }
 
-.plot-dialog__head {
+.content-dialog__head {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -139,12 +145,12 @@ body {
     border-bottom: 1px solid var(--rule);
 }
 
-.plot-dialog__title {
+.content-dialog__title {
     margin: 0 0 0.5rem;
     font-size: 1.1rem;
 }
 
-.plot-dialog__close {
+.content-dialog__close {
     border: none;
     background: none;
     font-size: 1.5rem;
@@ -153,10 +159,20 @@ body {
     color: var(--ink);
 }
 
-.plot-dialog__body {
+.content-dialog__body {
     white-space: pre-wrap;
     max-height: 60vh;
     overflow-y: auto;
+}
+
+/* Raw .nfo variant: keep the XML uncorrupted — monospace, indentation and line breaks preserved,
+   no wrapping, scrolling horizontally instead. */
+.content-dialog__body--code {
+    white-space: pre;
+    overflow: auto;
+    font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+    font-size: 0.85rem;
+    tab-size: 2;
 }
 
 .form {

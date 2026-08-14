@@ -2,6 +2,7 @@ package de.videostorm.indexing.adapter.out.scan;
 
 import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.indexing.application.port.out.LibraryScan;
+import de.videostorm.indexing.domain.FeatureVideo;
 import de.videostorm.indexing.domain.RunCounts;
 import de.videostorm.indexing.domain.RunIssueType;
 import de.videostorm.indexing.domain.ScanReport;
@@ -15,6 +16,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -111,13 +113,16 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void countsAFolderWithNoRecognisedVideoAsFoundButNotStaged() {
+    void cataloguesOnlyFoldersWithAFeatureAndIgnoresAMetadataOnlyFolder() {
         movieFolder("Real Movie", "<movie><title>Real</title></movie>", "real.avi");
-        movieFolder("Just Metadata", "<movie><title>Stranded</title></movie>", "notes.txt");
+        Path metadataOnly = createFolder("Just Metadata");
+        write(metadataOnly.resolve("movie.nfo"), "<movie><title>Stranded</title></movie>");
+        write(metadataOnly.resolve("notes.txt"), "not a video");
 
         RunCounts counts = scan.scan(SourceType.MOVIES).counts();
 
-        assertThat(counts).isEqualTo(new RunCounts(2, 1));
+        // Only the folder with a feature is a movie; the metadata-only folder is neither found nor skipped.
+        assertThat(counts).isEqualTo(new RunCounts(1, 1, 0));
         assertThat(jdbc.queryForObject("SELECT title FROM movie_staging", String.class)).isEqualTo("Real");
     }
 
@@ -137,7 +142,7 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     @Test
     void cataloguesAFolderWithNoMetadataFromADerivedTitleFlaggedAsSuch() {
         Path folder = createFolder("The Blob (1958)");
-        write(folder.resolve("blob.mkv"), "video-bytes");
+        largeVideo(folder.resolve("blob.mkv"));
 
         ScanReport report = scan.scan(SourceType.MOVIES);
 
@@ -160,7 +165,7 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     void treatsAStructurallyBrokenNfoExactlyAsAnAbsentOne() {
         Path folder = createFolder("Half Written");
         write(folder.resolve("movie.nfo"), "<movie><title>Truncated");
-        write(folder.resolve("film.mp4"), "video-bytes");
+        largeVideo(folder.resolve("film.mp4"));
 
         ScanReport report = scan.scan(SourceType.MOVIES);
 
@@ -227,7 +232,7 @@ class MovieScanIT extends PostgresIntegrationTestBase {
 
         ScanReport report = scan.scan(SourceType.MOVIES);
 
-        assertThat(report.counts()).isEqualTo(new RunCounts(1, 0));
+        assertThat(report.counts()).isEqualTo(new RunCounts(0, 0, 0));
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isZero();
         assertThat(report.issues())
                 .filteredOn(issue -> issue.type() == RunIssueType.NO_VIDEO)
@@ -284,6 +289,74 @@ class MovieScanIT extends PostgresIntegrationTestBase {
                 .hasSize(1);
     }
 
+    @Test
+    void discoversAMovieNestedSeveralDirectoriesBelowTheRoot() {
+        // Movies/Action/Taken 3 (2014)/ — the movie folder sits three levels below the source root.
+        Path nested = createFolder("Movies/Action/Taken 3 (2014)");
+        write(nested.resolve("movie.nfo"), "<movie><title>Taken 3</title><year>2014</year></movie>");
+        largeVideo(nested.resolve("taken3.mkv"));
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        assertThat(report.counts()).isEqualTo(new RunCounts(1, 1, 0));
+        assertThat(jdbc.queryForObject("SELECT title FROM movie_staging", String.class)).isEqualTo("Taken 3");
+    }
+
+    @Test
+    void discoversAMovieAtTheFifthLevelButNotOneDeeper() {
+        // The root's immediate child is level 1, so a/b/c/d/<movie> is level 5 and a/b/c/d/e/<movie> is level 6.
+        Path atFifth = createFolder("a/b/c/d/Level Five (2001)");
+        write(atFifth.resolve("movie.nfo"), "<movie><title>Level Five</title></movie>");
+        largeVideo(atFifth.resolve("five.mkv"));
+        Path atSixth = createFolder("a/b/c/d/e/Level Six (2002)");
+        write(atSixth.resolve("movie.nfo"), "<movie><title>Level Six</title></movie>");
+        largeVideo(atSixth.resolve("six.mkv"));
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        // The level-5 movie is discovered; the level-6 one is beyond the depth cap and never scanned.
+        assertThat(report.counts()).isEqualTo(new RunCounts(1, 1, 0));
+        assertThat(jdbc.queryForObject("SELECT title FROM movie_staging", String.class)).isEqualTo("Level Five");
+    }
+
+    @Test
+    void skipsADirectoryWhoseOnlyVideosAreBelowTheFeatureSize() {
+        Path trailerOnly = createFolder("Only A Trailer (2014)");
+        write(trailerOnly.resolve("movie.nfo"), "<movie><title>Only A Trailer</title></movie>");
+        write(trailerOnly.resolve("trailer.1080p.mp4"), "far below the feature size");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        // A recognised video is present, but nothing near feature size: not a movie, counted as skipped.
+        assertThat(report.counts()).isEqualTo(new RunCounts(0, 0, 1));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isZero();
+    }
+
+    @Test
+    void countsBothAMovieAndASkippedTrailerFolderInOneRun() {
+        movieFolder("Heat (1995)", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
+        Path trailerOnly = createFolder("Coming Soon");
+        write(trailerOnly.resolve("teaser.mp4"), "tiny");
+
+        RunCounts counts = scan.scan(SourceType.MOVIES).counts();
+
+        assertThat(counts).isEqualTo(new RunCounts(1, 1, 1));
+    }
+
+    @Test
+    void doesNotDescendIntoAMovieFoldersOwnSubdirectories() {
+        movieFolder("Mad Max (2015)", "<movie><title>Mad Max</title></movie>", "Mad Max.mkv");
+        // A featurette that is itself feature-sized, in an extras subfolder, must not become its own movie.
+        Path extras = createFolder("Mad Max (2015)/featurettes");
+        largeVideo(extras.resolve("making-of.mkv"));
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        assertThat(report.counts()).isEqualTo(new RunCounts(1, 1, 0));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT title FROM movie_staging", String.class)).isEqualTo("Mad Max");
+    }
+
     private Path createFolder(String name) {
         Path folder = MOVIES_DIR.resolve(name);
         try {
@@ -297,13 +370,26 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     private Path movieFolder(String name, String nfo, String videoFile) {
         Path folder = createFolder(name);
         write(folder.resolve("movie.nfo"), nfo);
-        write(folder.resolve(videoFile), "video-bytes");
+        largeVideo(folder.resolve(videoFile));
         return folder;
     }
 
     private static void write(Path file, String content) {
         try {
             Files.writeString(file, content);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Creates a recognised video that reaches the feature-size threshold, so its folder is catalogued
+     * as a movie. Written as a sparse file — its reported size is {@link FeatureVideo#MIN_BYTES} but it
+     * consumes no real disk — so the size rule can be exercised without moving half a gigabyte.
+     */
+    private static void largeVideo(Path file) {
+        try (RandomAccessFile raf = new RandomAccessFile(file.toFile(), "rw")) {
+            raf.setLength(FeatureVideo.MIN_BYTES);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

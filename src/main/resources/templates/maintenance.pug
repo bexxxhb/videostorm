@@ -53,6 +53,8 @@ block content
             th Finished
             th Found
             th Indexed
+            th Skipped
+            th Missing data
             th Report
         tbody
           each run in runs
@@ -63,6 +65,8 @@ block content
               td= run.finishedAt
               td= run.found
               td= run.indexed
+              td= run.skipped
+              td= run.missingData
               td
                 if run.downloadable
                   a.history__download(href="/maintenance/runs/" + run.id + "/report.csv") Download CSV

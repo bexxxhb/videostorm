@@ -1,5 +1,7 @@
 package de.videostorm.catalogue.adapter.out.persistence;
 
+import de.videostorm.catalogue.application.ShowSort;
+import de.videostorm.catalogue.application.ShowSortField;
 import de.videostorm.catalogue.application.port.out.ShowRepository;
 import de.videostorm.catalogue.domain.GenreList;
 import de.videostorm.catalogue.domain.Rating;
@@ -20,13 +22,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 class ShowRepositoryAdapter implements ShowRepository {
 
-    // Matches idx_show_listing_sort: normalized title ascending, with (year, id) as a
-    // deterministic tiebreak so paging can never duplicate or skip a row.
-    private static final Sort FIXED_SORT = Sort.by(
-            Sort.Order.asc("normalizedTitle"),
-            Sort.Order.asc("year"),
-            Sort.Order.asc("id"));
-
     private final ShowJpaRepository jpaRepository;
 
     @Override
@@ -35,13 +30,30 @@ class ShowRepositoryAdapter implements ShowRepository {
     }
 
     @Override
-    public List<Show> findPage(SearchTerm searchTerm, int pageNumber, int pageSize) {
-        PageRequest pageRequest = PageRequest.of(pageNumber - 1, pageSize, FIXED_SORT);
+    public List<Show> findPage(SearchTerm searchTerm, ShowSort sort, int pageNumber, int pageSize) {
+        PageRequest pageRequest = PageRequest.of(pageNumber - 1, pageSize, sortOf(sort));
         return jpaRepository
                 .findMatching(likeTitleTerm(searchTerm), likeGenreTerm(searchTerm), yearFilter(searchTerm), pageRequest)
                 .stream()
                 .map(ShowRepositoryAdapter::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Optional<String> findRawNfo(long id) {
+        return jpaRepository.findRawNfoById(id);
+    }
+
+    private static Sort sortOf(ShowSort sort) {
+        return ListingSort.by(property(sort.field()), sort.direction());
+    }
+
+    private static String property(ShowSortField field) {
+        return switch (field) {
+            case TITLE -> "titleSort";
+            case YEAR -> "yearSort";
+            case RATING -> "ratingValue";
+        };
     }
 
     private static String likeTitleTerm(SearchTerm searchTerm) {
@@ -73,6 +85,10 @@ class ShowRepositoryAdapter implements ShowRepository {
                 ShowStatus.valueOf(entity.getStatus()),
                 rating,
                 GenreList.parse(entity.getGenres()),
-                Optional.ofNullable(entity.getPlot()));
+                Optional.ofNullable(entity.getPlot()),
+                entity.getSeasonCount(),
+                entity.getEpisodeCount(),
+                Optional.ofNullable(entity.getImdbId()),
+                entity.isHasRawNfo());
     }
 }

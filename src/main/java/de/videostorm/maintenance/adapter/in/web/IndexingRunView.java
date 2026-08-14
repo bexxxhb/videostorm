@@ -29,6 +29,8 @@ public class IndexingRunView {
     private final String finishedAt;
     private final int found;
     private final int indexed;
+    private final int skipped;
+    private final int missingData;
     private final boolean downloadable;
 
     static IndexingRunView of(IndexingRun run, boolean downloadable) {
@@ -40,6 +42,8 @@ public class IndexingRunView {
                 run.finishedAt() == null ? "" : TIMESTAMP.format(run.finishedAt()),
                 run.counts().found(),
                 run.counts().indexed(),
+                run.counts().skipped(),
+                run.counts().missingData(),
                 downloadable);
     }
 }

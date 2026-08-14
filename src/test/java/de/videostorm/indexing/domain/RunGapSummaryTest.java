@@ -32,6 +32,32 @@ class RunGapSummaryTest {
     }
 
     @Test
+    void countsAnEntryMissingBothTitleAndYearOnlyOnce() {
+        int missing = RunGapSummary.distinctMissingDataEntries(List.of(
+                RunIssue.missingField("/m/Blob", "The Blob", RunIssue.TITLE_FIELD),
+                RunIssue.missingField("/m/Blob", "The Blob", RunIssue.YEAR_FIELD),
+                RunIssue.missingField("/m/Heat", "Heat", RunIssue.YEAR_FIELD)));
+
+        assertThat(missing).isEqualTo(2);
+    }
+
+    @Test
+    void distinctMissingDataIgnoresEverySkipDuplicateAndMissingVideoIssue() {
+        int missing = RunGapSummary.distinctMissingDataEntries(List.of(
+                RunIssue.noVideo("/m/Just Metadata", "Stranded"),
+                RunIssue.ignoredVideo("/m/Dune/trailer.mp4", "Dune"),
+                RunIssue.duplicate("/m/Heat (dup)", "Heat", "/m/Heat"),
+                RunIssue.skippedEpisode("/s/Show/ep.mkv", "Show")));
+
+        assertThat(missing).isZero();
+    }
+
+    @Test
+    void distinctMissingDataIsZeroWhenThereAreNoIssues() {
+        assertThat(RunGapSummary.distinctMissingDataEntries(List.of())).isZero();
+    }
+
+    @Test
     void noneIsAllZeroes() {
         assertThat(RunGapSummary.from(List.of())).isEqualTo(RunGapSummary.none());
         assertThat(RunGapSummary.none().titleGaps()).isZero();

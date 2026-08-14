@@ -1,5 +1,7 @@
 package de.videostorm.catalogue.adapter.out.persistence;
 
+import de.videostorm.catalogue.application.MovieSort;
+import de.videostorm.catalogue.application.MovieSortField;
 import de.videostorm.catalogue.application.port.out.MovieRepository;
 import de.videostorm.catalogue.domain.GenreList;
 import de.videostorm.catalogue.domain.Movie;
@@ -19,13 +21,6 @@ import java.util.Optional;
 @RequiredArgsConstructor
 class MovieRepositoryAdapter implements MovieRepository {
 
-    // Matches idx_movie_listing_sort: normalized title ascending, with (year, id) as a
-    // deterministic tiebreak so paging can never duplicate or skip a row.
-    private static final Sort FIXED_SORT = Sort.by(
-            Sort.Order.asc("normalizedTitle"),
-            Sort.Order.asc("year"),
-            Sort.Order.asc("id"));
-
     private final MovieJpaRepository jpaRepository;
 
     @Override
@@ -34,13 +29,31 @@ class MovieRepositoryAdapter implements MovieRepository {
     }
 
     @Override
-    public List<Movie> findPage(SearchTerm searchTerm, int pageNumber, int pageSize) {
-        PageRequest pageRequest = PageRequest.of(pageNumber - 1, pageSize, FIXED_SORT);
+    public List<Movie> findPage(SearchTerm searchTerm, MovieSort sort, int pageNumber, int pageSize) {
+        PageRequest pageRequest = PageRequest.of(pageNumber - 1, pageSize, sortOf(sort));
         return jpaRepository
                 .findMatching(likeTitleTerm(searchTerm), likeGenreTerm(searchTerm), yearFilter(searchTerm), pageRequest)
                 .stream()
                 .map(MovieRepositoryAdapter::toDomain)
                 .toList();
+    }
+
+    @Override
+    public Optional<String> findRawNfo(long id) {
+        return jpaRepository.findRawNfoById(id);
+    }
+
+    private static Sort sortOf(MovieSort sort) {
+        return ListingSort.by(property(sort.field()), sort.direction());
+    }
+
+    private static String property(MovieSortField field) {
+        return switch (field) {
+            case TITLE -> "titleSort";
+            case YEAR -> "yearSort";
+            case RATING -> "ratingValue";
+            case RESOLUTION -> "resolutionHeight";
+        };
     }
 
     private static String likeTitleTerm(SearchTerm searchTerm) {
@@ -74,6 +87,7 @@ class MovieRepositoryAdapter implements MovieRepository {
                 Optional.ofNullable(entity.getRuntimeMinutes()),
                 Optional.ofNullable(entity.getResolution()),
                 Optional.ofNullable(entity.getImdbId()),
-                Optional.ofNullable(entity.getPlot()));
+                Optional.ofNullable(entity.getPlot()),
+                entity.isHasRawNfo());
     }
 }

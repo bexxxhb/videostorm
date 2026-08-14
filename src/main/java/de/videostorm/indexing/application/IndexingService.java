@@ -11,6 +11,8 @@ import de.videostorm.indexing.application.port.out.LibraryScan;
 import de.videostorm.indexing.application.port.out.MountPreflight;
 import de.videostorm.indexing.application.port.out.RunIssueRepository;
 import de.videostorm.indexing.domain.IndexingRun;
+import de.videostorm.indexing.domain.RunCounts;
+import de.videostorm.indexing.domain.RunGapSummary;
 import de.videostorm.indexing.domain.ScanReport;
 import de.videostorm.sources.domain.SourcePath;
 import de.videostorm.sources.domain.SourceType;
@@ -91,7 +93,9 @@ public class IndexingService implements TriggerReindex, IndexingStatus, Reconcil
             promotion.promote(run.type());
             runIssues.record(run.id(), report.issues());
             runIssues.pruneDetailBeyond(RunIssueRepository.DETAIL_RETENTION_LIMIT);
-            repository.save(run.complete(report.counts(), clock.instant()));
+            RunCounts finalCounts = report.counts()
+                    .withMissingData(RunGapSummary.distinctMissingDataEntries(report.issues()));
+            repository.save(run.complete(finalCounts, clock.instant()));
         } catch (RuntimeException e) {
             log.error("Indexing run {} for {} failed", run.id(), run.type(), e);
             repository.save(run.fail(clock.instant()));

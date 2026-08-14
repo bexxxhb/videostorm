@@ -74,6 +74,98 @@ class EmbyMovieNfoParserTest {
     }
 
     @Test
+    void readsAFlatTopLevelRatingAsTheDefaultTmdbScore() {
+        ParsedMovie movie = parser.parse("""
+                <movie>
+                  <title>13 Assassins</title>
+                  <year>2010</year>
+                  <rating>7.3</rating>
+                  <votes>659</votes>
+                </movie>
+                """);
+
+        assertThat(movie.ratings()).hasSize(1);
+        ParsedRating flat = movie.ratings().get(0);
+        assertThat(flat.source()).isEqualTo("TMDB");
+        assertThat(flat.value()).isEqualByComparingTo(new BigDecimal("7.3"));
+        assertThat(flat.max()).isNull();
+        assertThat(flat.votes()).isEqualTo(659);
+        assertThat(flat.isDefault()).isTrue();
+    }
+
+    @Test
+    void prefersTheStructuredRatingsBlockOverAFlatRating() {
+        ParsedMovie movie = parser.parse("""
+                <movie>
+                  <title>13 Assassins</title>
+                  <rating>7.3</rating>
+                  <votes>659</votes>
+                  <ratings>
+                    <rating name="themoviedb" max="10" default="true">
+                      <value>6.3</value>
+                      <votes>4200</votes>
+                    </rating>
+                  </ratings>
+                </movie>
+                """);
+
+        assertThat(movie.ratings()).hasSize(1);
+        ParsedRating structured = movie.ratings().get(0);
+        assertThat(structured.source()).isEqualTo("themoviedb");
+        assertThat(structured.value()).isEqualByComparingTo(new BigDecimal("6.3"));
+        assertThat(structured.max()).isEqualByComparingTo(new BigDecimal("10"));
+        assertThat(structured.votes()).isEqualTo(4200);
+    }
+
+    @Test
+    void dropsAMalformedFlatRatingToAnEmptyRatingCell() {
+        ParsedMovie movie = parser.parse("""
+                <movie>
+                  <title>No Score</title>
+                  <rating>N/A</rating>
+                </movie>
+                """);
+
+        assertThat(movie.ratings()).isEmpty();
+    }
+
+    @Test
+    void extractsTheLeadingMinutesFromARuntimeWithATrailingSuffix() {
+        ParsedMovie movie = parser.parse("""
+                <movie>
+                  <title>Example</title>
+                  <runtime>90 min (25 fps)</runtime>
+                </movie>
+                """);
+
+        assertThat(movie.runtimeMinutes()).isEqualTo(90);
+    }
+
+    @Test
+    void keepsAThousandsSeparatorInALeadingRuntimeRatherThanTruncatingIt() {
+        ParsedMovie movie = parser.parse("""
+                <movie>
+                  <title>Very Long Cut</title>
+                  <runtime>1,234 min</runtime>
+                </movie>
+                """);
+
+        assertThat(movie.runtimeMinutes()).isEqualTo(1234);
+    }
+
+    @Test
+    void dropsARuntimeWithNoLeadingDigitsToAnEmptyCell() {
+        ParsedMovie movie = parser.parse("""
+                <movie>
+                  <title>No Runtime</title>
+                  <runtime>N/A</runtime>
+                </movie>
+                """);
+
+        assertThat(movie.runtimeMinutes()).isNull();
+    }
+
+    @Test
     void keepsAThinlyScrapedFilmWithEveryAbsentFieldBlank() {
         ParsedMovie movie = parser.parse("""
                 <movie>
