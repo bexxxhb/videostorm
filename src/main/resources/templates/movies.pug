@@ -22,6 +22,7 @@ block content
         th
           a.sort-link(href=sort.resolution.url) Resolution !{sort.resolution.marker}
         th Plot
+        th Actors
         th IMDb
         th nfo raw
     tbody
@@ -37,6 +38,9 @@ block content
           td
             if movie.hasPlot
               a.plot-link(href="#", data-plot=movie.plotBase64, data-title=movie.title) Plot
+          td
+            if movie.hasActors
+              a.actors-link(href=movie.actorsUrl, data-title=movie.title) Actors
           td
             if movie.imdbUrl
               a.imdb-link(href=movie.imdbUrl)= movie.imdbLinkText

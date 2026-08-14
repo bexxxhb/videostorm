@@ -34,7 +34,7 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(authorize -> {
             authorize.requestMatchers("/", "/movies", "/shows", "/movies/*/nfo", "/shows/*/nfo",
-                    "/css/**", "/js/**").permitAll();
+                    "/movies/*/actors", "/shows/*/actors", "/css/**", "/js/**", "/img/**").permitAll();
             if (maintenanceEnabled) {
                 authorize.requestMatchers("/login").permitAll()
                         .anyRequest().hasRole("ADMIN");

@@ -14,5 +14,6 @@ public record Show(
         int seasonCount,
         int episodeCount,
         Optional<String> imdbId,
-        boolean hasRawNfo) {
+        boolean hasRawNfo,
+        boolean hasCast) {
 }

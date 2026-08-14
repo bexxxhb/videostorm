@@ -47,6 +47,10 @@ public class MovieRow {
     // from rawNfoUrl on demand, so the listing never carries the text for every row.
     private final boolean hasRawNfo;
     private final String rawNfoUrl;
+    // The "Actors" link renders only when true; the dialog fetches the cast from actorsUrl on demand,
+    // so the listing never carries any actor for any row.
+    private final boolean hasActors;
+    private final String actorsUrl;
 
     static MovieRow from(Movie movie, int index, long number) {
         Optional<String> plot = movie.plot().filter(text -> !text.isBlank());
@@ -66,7 +70,9 @@ public class MovieRow {
                 plot.isPresent(),
                 plot.map(MovieRow::encodeBase64).orElse(""),
                 movie.hasRawNfo(),
-                movie.hasRawNfo() ? "/movies/" + movie.id() + "/nfo" : "");
+                movie.hasRawNfo() ? "/movies/" + movie.id() + "/nfo" : "",
+                movie.hasCast(),
+                movie.hasCast() ? "/movies/" + movie.id() + "/actors" : "");
     }
 
     private static String encodeBase64(String text) {

@@ -1,6 +1,7 @@
 package de.videostorm.catalogue.application.port.out;
 
 import de.videostorm.catalogue.application.MovieSort;
+import de.videostorm.catalogue.domain.CastMember;
 import de.videostorm.catalogue.domain.Movie;
 import de.videostorm.catalogue.domain.SearchTerm;
 
@@ -28,4 +29,10 @@ public interface MovieRepository {
      * no such movie or its {@code raw_nfo} is null.
      */
     Optional<String> findRawNfo(long id);
+
+    /**
+     * The cast of the movie with {@code id}, top-billed first, fetched on demand. Empty Optional when
+     * there is no such movie; a present (possibly empty) list when there is.
+     */
+    Optional<List<CastMember>> findCast(long id);
 }

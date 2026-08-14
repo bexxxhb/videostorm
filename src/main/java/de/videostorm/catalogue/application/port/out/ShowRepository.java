@@ -1,6 +1,7 @@
 package de.videostorm.catalogue.application.port.out;
 
 import de.videostorm.catalogue.application.ShowSort;
+import de.videostorm.catalogue.domain.CastMember;
 import de.videostorm.catalogue.domain.SearchTerm;
 import de.videostorm.catalogue.domain.Show;
 
@@ -28,4 +29,10 @@ public interface ShowRepository {
      * no such show or its {@code raw_nfo} is null.
      */
     Optional<String> findRawNfo(long id);
+
+    /**
+     * The cast of the show with {@code id}, top-billed first, fetched on demand. Empty Optional when
+     * there is no such show; a present (possibly empty) list when there is.
+     */
+    Optional<List<CastMember>> findCast(long id);
 }

@@ -3,6 +3,7 @@ package de.videostorm.catalogue.adapter.out.persistence;
 import de.videostorm.catalogue.application.ShowSort;
 import de.videostorm.catalogue.application.ShowSortField;
 import de.videostorm.catalogue.application.port.out.ShowRepository;
+import de.videostorm.catalogue.domain.CastMember;
 import de.videostorm.catalogue.domain.GenreList;
 import de.videostorm.catalogue.domain.Rating;
 import de.videostorm.catalogue.domain.SearchTerm;
@@ -42,6 +43,17 @@ class ShowRepositoryAdapter implements ShowRepository {
     @Override
     public Optional<String> findRawNfo(long id) {
         return jpaRepository.findRawNfoById(id);
+    }
+
+    @Override
+    public Optional<List<CastMember>> findCast(long id) {
+        // Distinguish an unknown show (empty Optional -> 404) from a show with no cast (present, empty).
+        if (!jpaRepository.existsById(id)) {
+            return Optional.empty();
+        }
+        return Optional.of(jpaRepository.findCastByShowId(id).stream()
+                .map(CastRow::toCastMember)
+                .toList());
     }
 
     private static Sort sortOf(ShowSort sort) {
@@ -89,6 +101,7 @@ class ShowRepositoryAdapter implements ShowRepository {
                 entity.getSeasonCount(),
                 entity.getEpisodeCount(),
                 Optional.ofNullable(entity.getImdbId()),
-                entity.isHasRawNfo());
+                entity.isHasRawNfo(),
+                entity.isHasCast());
     }
 }

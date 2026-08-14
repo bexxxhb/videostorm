@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -19,8 +20,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -69,6 +72,7 @@ class ShowListingIT extends PostgresIntegrationTestBase {
                 .contains("<th>Seasons</th>")
                 .contains("<th>Total Episodes</th>")
                 .contains("<th>Plot</th>")
+                .contains("<th>Actors</th>")
                 .contains("<th>IMDb</th>")
                 .contains("<th>nfo raw</th>")
                 .doesNotContain("Resolution");
@@ -137,6 +141,64 @@ class ShowListingIT extends PostgresIntegrationTestBase {
                 TitleNormalizer.normalize("Unscraped Folder"));
 
         mockMvc.perform(get("/shows/" + id + "/nfo")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aShowWithCastRendersAnActorsLinkButCarriesNoActorDetailInTheListingDom() throws Exception {
+        insertShow("Breaking Bad", 2008, "ENDED", null, null, List.of());
+        long id = idOf("Breaking Bad");
+        insertActor(id, "Bryan Cranston", "Walter White", 0, "http://image.tmdb.org/t/p/w185/walt.jpg");
+
+        String html = render("/shows");
+
+        assertThat(html).contains(
+                "<a class=\"actors-link\" href=\"/shows/" + id + "/actors\" data-title=\"Breaking Bad\">Actors</a>");
+        assertThat(html)
+                .doesNotContain("Bryan Cranston")
+                .doesNotContain("Walter White")
+                .doesNotContain("image.tmdb.org");
+    }
+
+    @Test
+    void aShowWithoutCastRendersAnEmptyCellWithNoActorsLink() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+
+        String html = render("/shows");
+
+        assertThat(html).doesNotContain("actors-link");
+    }
+
+    @Test
+    void theActorsEndpointServesTheCastAsJsonTopBilledFirstWithHttpsThumbs() throws Exception {
+        insertShow("Breaking Bad", 2008, "ENDED", null, null, List.of());
+        long id = idOf("Breaking Bad");
+        insertActor(id, "Bryan Cranston", "Walter White", 0, "http://image.tmdb.org/t/p/w185/walt.jpg");
+        insertActor(id, "Extra", null, 1, null);
+
+        mockMvc.perform(get("/shows/" + id + "/actors"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$[0].name").value("Bryan Cranston"))
+                .andExpect(jsonPath("$[0].role").value("Walter White"))
+                .andExpect(jsonPath("$[0].thumbUrl").value("https://image.tmdb.org/t/p/w185/walt.jpg"))
+                .andExpect(jsonPath("$[1].name").value("Extra"))
+                .andExpect(jsonPath("$[1].role").value(nullValue()))
+                .andExpect(jsonPath("$[1].thumbUrl").value(nullValue()));
+    }
+
+    @Test
+    void theActorsEndpointReturnsAnEmptyArrayWhenTheShowHasNoCast() throws Exception {
+        insertShow("Unscraped Folder", null, "UNKNOWN", null, null, List.of());
+        long id = idOf("Unscraped Folder");
+
+        mockMvc.perform(get("/shows/" + id + "/actors"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+    }
+
+    @Test
+    void theActorsEndpointReturns404ForAnUnknownShow() throws Exception {
+        mockMvc.perform(get("/shows/999999/actors")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -485,6 +547,12 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         jdbcTemplate.update(
                 "INSERT INTO episode (show_id, season_number, episode_number) VALUES (?, ?, ?)",
                 showId, seasonNumber, episodeNumber);
+    }
+
+    private void insertActor(long showId, String name, String role, Integer billingOrder, String thumb) {
+        jdbcTemplate.update(
+                "INSERT INTO show_actor (show_id, name, role, billing_order, thumb) VALUES (?, ?, ?, ?, ?)",
+                showId, name, role, billingOrder, thumb);
     }
 
     private void insertShowWithImdb(String title, String imdbId) {

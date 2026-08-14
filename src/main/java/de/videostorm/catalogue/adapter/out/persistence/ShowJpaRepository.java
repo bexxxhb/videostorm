@@ -37,4 +37,13 @@ interface ShowJpaRepository extends JpaRepository<ShowEntity, Long> {
     // a listing row). A missing row — or a NULL value — yields an empty Optional.
     @Query(value = "SELECT raw_nfo FROM show WHERE id = :id", nativeQuery = true)
     Optional<String> findRawNfoById(@Param("id") long id);
+
+    // The show's cast, top-billed first (NULL billing_order last), tie-broken on id so the order is
+    // stable. Fetched only when the "Actors" link is clicked, never with a listing row.
+    @Query(value = """
+            SELECT name, role, thumb FROM show_actor
+            WHERE show_id = :id
+            ORDER BY billing_order NULLS LAST, id
+            """, nativeQuery = true)
+    List<CastRow> findCastByShowId(@Param("id") long id);
 }

@@ -49,7 +49,7 @@ class MovieRowTest {
     void aPresentRatingIsFormattedWithItsProvider() {
         Movie movie = new Movie(1, "Heat", Year.of(1995),
                 Optional.of(new Rating("TMDB", new BigDecimal("7.8"))), GenreList.EMPTY, Optional.of(170),
-                Optional.empty(), Optional.empty(), Optional.empty(), false);
+                Optional.empty(), Optional.empty(), Optional.empty(), false, false);
 
         MovieRow row = MovieRow.from(movie, 0, 1);
 
@@ -96,12 +96,12 @@ class MovieRowTest {
 
     private static Movie movieWithResolution(String resolution) {
         return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.of(resolution), Optional.empty(), Optional.empty(), false);
+                Optional.of(resolution), Optional.empty(), Optional.empty(), false, false);
     }
 
     private static Movie movieWithImdbId(String imdbId) {
         return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.empty(), Optional.of(imdbId), Optional.empty(), false);
+                Optional.empty(), Optional.of(imdbId), Optional.empty(), false, false);
     }
 
     @Test
@@ -132,7 +132,7 @@ class MovieRowTest {
 
     private static Movie movieWithPlot(String plot) {
         return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.of(plot), false);
+                Optional.empty(), Optional.empty(), Optional.of(plot), false, false);
     }
 
     @Test
@@ -153,7 +153,28 @@ class MovieRowTest {
 
     private static Movie movieWithRawNfo() {
         return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), true);
+                Optional.empty(), Optional.empty(), Optional.empty(), true, false);
+    }
+
+    @Test
+    void aMovieWithoutCastHasNoLinkAndAnEmptyUrl() {
+        MovieRow row = MovieRow.from(minimalMovie(), 0, 1);
+
+        assertThat(row.isHasActors()).isFalse();
+        assertThat(row.getActorsUrl()).isEmpty();
+    }
+
+    @Test
+    void aMovieWithCastLinksToItsOnDemandActorsEndpoint() {
+        MovieRow row = MovieRow.from(movieWithCast(), 0, 1);
+
+        assertThat(row.isHasActors()).isTrue();
+        assertThat(row.getActorsUrl()).isEqualTo("/movies/1/actors");
+    }
+
+    private static Movie movieWithCast() {
+        return new Movie(1, "Heat", Year.of(1995), Optional.empty(), GenreList.EMPTY, Optional.empty(),
+                Optional.empty(), Optional.empty(), Optional.empty(), false, true);
     }
 
     private static String decode(String base64) {
@@ -162,6 +183,6 @@ class MovieRowTest {
 
     private static Movie minimalMovie() {
         return new Movie(1, "Unscraped Folder", Year.UNKNOWN, Optional.empty(), GenreList.EMPTY, Optional.empty(),
-                Optional.empty(), Optional.empty(), Optional.empty(), false);
+                Optional.empty(), Optional.empty(), Optional.empty(), false, false);
     }
 }

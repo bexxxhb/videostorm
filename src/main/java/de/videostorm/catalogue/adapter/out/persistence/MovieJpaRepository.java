@@ -37,4 +37,13 @@ interface MovieJpaRepository extends JpaRepository<MovieEntity, Long> {
     // a listing row). A missing row — or a NULL value — yields an empty Optional.
     @Query(value = "SELECT raw_nfo FROM movie WHERE id = :id", nativeQuery = true)
     Optional<String> findRawNfoById(@Param("id") long id);
+
+    // The movie's cast, top-billed first (NULL billing_order last), tie-broken on id so the order is
+    // stable. Fetched only when the "Actors" link is clicked, never with a listing row.
+    @Query(value = """
+            SELECT name, role, thumb FROM movie_actor
+            WHERE movie_id = :id
+            ORDER BY billing_order NULLS LAST, id
+            """, nativeQuery = true)
+    List<CastRow> findCastByMovieId(@Param("id") long id);
 }

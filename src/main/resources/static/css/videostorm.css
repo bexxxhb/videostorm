@@ -112,6 +112,11 @@ body {
     cursor: pointer;
 }
 
+.actors-link {
+    color: var(--accent);
+    cursor: pointer;
+}
+
 /* Padding lives on the panel, not the dialog, so a click anywhere off the panel lands on the
    dialog element itself and is treated as a backdrop click (see content-dialog.js). */
 .content-dialog {
@@ -173,6 +178,43 @@ body {
     font-family: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
     font-size: 0.85rem;
     tab-size: 2;
+}
+
+/* Cast variant: a wrapping grid of actor blocks, each a fixed-width column so the portraits align. */
+.content-dialog__body--actors {
+    white-space: normal;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+/* One actor: portrait first and dominant, name below it, role below the name. */
+.actor-card {
+    display: flex;
+    flex-direction: column;
+    width: 8rem;
+    text-align: center;
+}
+
+/* Fixed 2:3 portrait dimensions, shared by real thumbnails and the "no image" placeholder so the
+   grid stays aligned whether or not an actor carries a portrait. */
+.actor-card__image {
+    width: 8rem;
+    height: 12rem;
+    object-fit: cover;
+    background: var(--rule);
+    border: 1px solid var(--rule);
+}
+
+.actor-card__name {
+    margin-top: 0.5rem;
+    font-weight: 600;
+}
+
+.actor-card__role {
+    margin-top: 0.125rem;
+    font-size: 0.85rem;
+    color: var(--muted, #666);
 }
 
 .form {

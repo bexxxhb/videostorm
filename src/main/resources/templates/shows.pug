@@ -22,6 +22,7 @@ block content
         th Seasons
         th Total Episodes
         th Plot
+        th Actors
         th IMDb
         th nfo raw
     tbody
@@ -38,6 +39,9 @@ block content
           td
             if show.hasPlot
               a.plot-link(href="#", data-plot=show.plotBase64, data-title=show.title) Plot
+          td
+            if show.hasActors
+              a.actors-link(href=show.actorsUrl, data-title=show.title) Actors
           td
             if show.imdbUrl
               a.imdb-link(href=show.imdbUrl)= show.imdbLinkText

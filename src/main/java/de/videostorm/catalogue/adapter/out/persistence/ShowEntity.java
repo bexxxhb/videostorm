@@ -55,6 +55,12 @@ class ShowEntity {
     @Formula("(raw_nfo IS NOT NULL)")
     private boolean hasRawNfo;
 
+    // Whether any actor is stored for this show, so the listing renders the "Actors" link only when
+    // there is a cast to open. The cast itself is fetched on demand, never hydrated with a listing row.
+    // Hibernate qualifies the unaliased `id` with this entity's table alias.
+    @Formula("(EXISTS (SELECT 1 FROM show_actor a WHERE a.show_id = id))")
+    private boolean hasCast;
+
     // Read-side aggregates over the episode table (issue #27); episodes have no JPA entity of their own,
     // so they are derived here as correlated subqueries. A show with no episode rows yields 0/0, which the
     // listing renders verbatim. Hibernate qualifies the unaliased `id` with this entity's table alias.
