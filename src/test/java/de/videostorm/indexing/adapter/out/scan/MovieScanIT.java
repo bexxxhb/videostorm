@@ -51,8 +51,10 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     @BeforeEach
     void reset() {
         jdbc.update("DELETE FROM movie_rating_staging");
+        jdbc.update("DELETE FROM movie_actor_staging");
         jdbc.update("DELETE FROM movie_staging");
         jdbc.update("DELETE FROM movie_rating");
+        jdbc.update("DELETE FROM movie_actor");
         jdbc.update("DELETE FROM movie");
         emptyLibrary();
     }
@@ -96,6 +98,44 @@ class MovieScanIT extends PostgresIntegrationTestBase {
         // Live catalogue untouched: still just the seeded row, no ratings.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_rating", Long.class)).isZero();
+    }
+
+    @Test
+    void stagesTheCastOfAMovieAndRecordsNoMissingCastIssue() {
+        movieFolder("Taken 3 (2014)", """
+                <movie>
+                  <title>Taken 3</title>
+                  <year>2014</year>
+                  <actor><name>Liam Neeson</name><role>Bryan Mills</role><order>0</order><tmdbid>3896</tmdbid></actor>
+                  <actor><name>Famke Janssen</name><role>Lenore</role><order>1</order></actor>
+                </movie>
+                """, "taken3.mkv");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        Long id = jdbc.queryForObject("SELECT id FROM movie_staging", Long.class);
+        List<Map<String, Object>> actors = jdbc.queryForList(
+                "SELECT name, tmdb_id FROM movie_actor_staging WHERE movie_id = ? ORDER BY billing_order", id);
+        assertThat(actors).extracting(a -> a.get("name")).containsExactly("Liam Neeson", "Famke Janssen");
+        assertThat(actors.get(0).get("tmdb_id")).isEqualTo("3896");
+        assertThat(report.issues())
+                .noneMatch(issue -> issue.type() == RunIssueType.MISSING_FIELD && "cast".equals(issue.field()));
+    }
+
+    @Test
+    void countsAMovieWithNoCastAsMissingData() {
+        Path folder = movieFolder("Heat (1995)", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_actor_staging", Long.class)).isZero();
+        assertThat(report.issues())
+                .filteredOn(issue -> issue.type() == RunIssueType.MISSING_FIELD && "cast".equals(issue.field()))
+                .singleElement()
+                .satisfies(issue -> {
+                    assertThat(issue.path()).isEqualTo(folder.toString());
+                    assertThat(issue.title()).isEqualTo("Heat");
+                });
     }
 
     @Test

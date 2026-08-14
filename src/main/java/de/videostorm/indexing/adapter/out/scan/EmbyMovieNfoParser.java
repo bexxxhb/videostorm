@@ -22,6 +22,7 @@ class EmbyMovieNfoParser {
                 EmbyNfo.integer(root, "year"),
                 ratings(root),
                 EmbyNfo.genres(root),
+                EmbyNfo.actors(root),
                 EmbyNfo.leadingInteger(root, "runtime"),
                 EmbyNfo.text(root, "plot"),
                 setName(root),

@@ -16,7 +16,7 @@ class DuplicateGuardTest {
 
     private static StagedMovie movie(String title, String originalTitle, int year, String imdbId) {
         ParsedMovie parsed = new ParsedMovie(title, originalTitle, year == 0 ? null : year,
-                List.of(), List.of(), null, null, null, null, imdbId, null, null);
+                List.of(), List.of(), List.of(), null, null, null, null, imdbId, null, null);
         return StagedMovie.from(parsed, title, "/ignored", null, null);
     }
 

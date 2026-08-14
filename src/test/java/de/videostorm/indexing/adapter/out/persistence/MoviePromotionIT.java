@@ -3,6 +3,7 @@ package de.videostorm.indexing.adapter.out.persistence;
 import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.indexing.application.port.out.CataloguePromotion;
 import de.videostorm.indexing.application.port.out.MovieStaging;
+import de.videostorm.indexing.domain.ParsedActor;
 import de.videostorm.indexing.domain.ParsedMovie;
 import de.videostorm.indexing.domain.ParsedRating;
 import de.videostorm.indexing.domain.StagedMovie;
@@ -26,9 +27,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Sql(statements = {
-        "DELETE FROM movie_rating_staging", "DELETE FROM movie_staging",
-        "DELETE FROM movie_rating", "DELETE FROM movie",
-        "DELETE FROM show_rating", "DELETE FROM episode", "DELETE FROM show"
+        "DELETE FROM movie_rating_staging", "DELETE FROM movie_actor_staging", "DELETE FROM movie_staging",
+        "DELETE FROM movie_rating", "DELETE FROM movie_actor", "DELETE FROM movie",
+        "DELETE FROM show_rating", "DELETE FROM show_actor", "DELETE FROM episode", "DELETE FROM show"
 }, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class MoviePromotionIT extends PostgresIntegrationTestBase {
 
@@ -44,8 +45,10 @@ class MoviePromotionIT extends PostgresIntegrationTestBase {
     private static StagedMovie sampleMovie() {
         ParsedRating tmdb = new ParsedRating("themoviedb", new BigDecimal("6.3"), new BigDecimal("10"), 4200, true);
         ParsedRating imdb = new ParsedRating("imdb", new BigDecimal("6.0"), new BigDecimal("10"), 250000, false);
+        ParsedActor lead = new ParsedActor("Liam Neeson", "Bryan Mills", 0, "http://img/neeson.jpg", "3896");
+        ParsedActor support = new ParsedActor("Famke Janssen", "Lenore", 1, null, null);
         ParsedMovie parsed = new ParsedMovie("96 Hours - Taken 3", "Taken 3", 2014,
-                List.of(tmdb, imdb), List.of("Action", "Thriller"), 109, "A plot.",
+                List.of(tmdb, imdb), List.of("Action", "Thriller"), List.of(lead, support), 109, "A plot.",
                 "Taken Collection", "133352", "tt2446042", null, "260346");
         return StagedMovie.from(parsed, "Taken 3 (2014)", "/media/movies/Taken 3 (2014)", "<movie>raw</movie>", "1080p");
     }
@@ -78,6 +81,25 @@ class MoviePromotionIT extends PostgresIntegrationTestBase {
                 WHERE m.id = ? ORDER BY r.id
                 """, stagedId);
         assertThat(ratings).extracting(r -> r.get("source")).containsExactly("themoviedb", "imdb");
+    }
+
+    @Test
+    void copiesEveryActorAndTheForeignKeysSurviveTheCopy() {
+        long stagedId = staging.stage(sampleMovie());
+
+        promotion.promote(SourceType.MOVIES);
+
+        // Actors are reachable only if their movie_id still points at the copied movie row; billing
+        // order is preserved and the optional sub-fields carry across, null where the .nfo omitted them.
+        List<Map<String, Object>> actors = jdbc.queryForList("""
+                SELECT a.name, a.role, a.thumb, a.tmdb_id FROM movie_actor a JOIN movie m ON m.id = a.movie_id
+                WHERE m.id = ? ORDER BY a.billing_order
+                """, stagedId);
+        assertThat(actors).extracting(a -> a.get("name")).containsExactly("Liam Neeson", "Famke Janssen");
+        assertThat(actors.get(0).get("role")).isEqualTo("Bryan Mills");
+        assertThat(actors.get(0).get("tmdb_id")).isEqualTo("3896");
+        assertThat(actors.get(1).get("thumb")).isNull();
+        assertThat(actors.get(1).get("tmdb_id")).isNull();
     }
 
     @Test

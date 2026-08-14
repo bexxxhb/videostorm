@@ -50,17 +50,21 @@ class ShowScanIT extends PostgresIntegrationTestBase {
     @BeforeEach
     void reset() {
         jdbc.update("DELETE FROM show_rating_staging");
+        jdbc.update("DELETE FROM show_actor_staging");
         jdbc.update("DELETE FROM episode_staging");
         jdbc.update("DELETE FROM show_staging");
         jdbc.update("DELETE FROM show_rating");
+        jdbc.update("DELETE FROM show_actor");
         jdbc.update("DELETE FROM episode");
         jdbc.update("DELETE FROM show");
         // The movie side is cleared too, symmetric to MovieScanIT: this class asserts a show scan
         // leaves the movie catalogue and its staging untouched, so both must start empty regardless of
         // what a movie IT staged before it.
         jdbc.update("DELETE FROM movie_rating_staging");
+        jdbc.update("DELETE FROM movie_actor_staging");
         jdbc.update("DELETE FROM movie_staging");
         jdbc.update("DELETE FROM movie_rating");
+        jdbc.update("DELETE FROM movie_actor");
         jdbc.update("DELETE FROM movie");
         emptyLibrary();
     }
@@ -109,6 +113,44 @@ class ShowScanIT extends PostgresIntegrationTestBase {
         // Live catalogue untouched: still just the seeded row, no ratings.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM show", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM show_rating", Long.class)).isZero();
+    }
+
+    @Test
+    void stagesTheCastOfAShowAndRecordsNoMissingCastIssue() {
+        showFolder("Breaking Bad (2008)", """
+                <tvshow>
+                  <title>Breaking Bad</title>
+                  <premiered>2008-01-20</premiered>
+                  <actor><name>Bryan Cranston</name><role>Walter White</role><order>0</order><tmdbid>17419</tmdbid></actor>
+                  <actor><name>Aaron Paul</name><role>Jesse Pinkman</role><order>1</order></actor>
+                </tvshow>
+                """);
+
+        ScanReport report = scan.scan(SourceType.SHOWS);
+
+        Long id = jdbc.queryForObject("SELECT id FROM show_staging", Long.class);
+        List<Map<String, Object>> actors = jdbc.queryForList(
+                "SELECT name, tmdb_id FROM show_actor_staging WHERE show_id = ? ORDER BY billing_order", id);
+        assertThat(actors).extracting(a -> a.get("name")).containsExactly("Bryan Cranston", "Aaron Paul");
+        assertThat(actors.get(0).get("tmdb_id")).isEqualTo("17419");
+        assertThat(report.issues())
+                .noneMatch(issue -> issue.type() == RunIssueType.MISSING_FIELD && "cast".equals(issue.field()));
+    }
+
+    @Test
+    void countsAShowWithNoCastAsMissingData() {
+        showFolder("Castless (2020)", "<tvshow><title>Castless</title><premiered>2020-01-01</premiered></tvshow>");
+
+        ScanReport report = scan.scan(SourceType.SHOWS);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM show_actor_staging", Long.class)).isZero();
+        assertThat(report.issues())
+                .filteredOn(issue -> issue.type() == RunIssueType.MISSING_FIELD && "cast".equals(issue.field()))
+                .singleElement()
+                .satisfies(issue -> {
+                    assertThat(issue.path()).isEqualTo(SHOWS_DIR.resolve("Castless (2020)").toString());
+                    assertThat(issue.title()).isEqualTo("Castless");
+                });
     }
 
     @Test

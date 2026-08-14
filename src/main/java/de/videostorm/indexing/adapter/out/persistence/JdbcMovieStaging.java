@@ -1,6 +1,7 @@
 package de.videostorm.indexing.adapter.out.persistence;
 
 import de.videostorm.indexing.application.port.out.MovieStaging;
+import de.videostorm.indexing.domain.ParsedActor;
 import de.videostorm.indexing.domain.ParsedRating;
 import de.videostorm.indexing.domain.StagedMovie;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -38,6 +39,11 @@ class JdbcMovieStaging implements MovieStaging {
             VALUES (:movieId, :source, :value, :max, :votes)
             """;
 
+    private static final String INSERT_ACTOR = """
+            INSERT INTO movie_actor_staging (movie_id, name, role, billing_order, thumb, tmdb_id)
+            VALUES (:movieId, :name, :role, :billingOrder, :thumb, :tmdbId)
+            """;
+
     private final NamedParameterJdbcTemplate jdbc;
 
     JdbcMovieStaging(NamedParameterJdbcTemplate jdbc) {
@@ -47,8 +53,9 @@ class JdbcMovieStaging implements MovieStaging {
     @Override
     @Transactional
     public void clear() {
-        // Child first: the staging FK forbids deleting a movie while its ratings remain.
+        // Children first: the staging FKs forbid deleting a movie while its ratings or actors remain.
         jdbc.getJdbcTemplate().update("DELETE FROM movie_rating_staging");
+        jdbc.getJdbcTemplate().update("DELETE FROM movie_actor_staging");
         jdbc.getJdbcTemplate().update("DELETE FROM movie_staging");
     }
 
@@ -89,6 +96,16 @@ class JdbcMovieStaging implements MovieStaging {
                     .addValue("value", rating.value())
                     .addValue("max", rating.max())
                     .addValue("votes", rating.votes()));
+        }
+
+        for (ParsedActor actor : movie.actors()) {
+            jdbc.update(INSERT_ACTOR, new MapSqlParameterSource()
+                    .addValue("movieId", movieId)
+                    .addValue("name", actor.name())
+                    .addValue("role", actor.role())
+                    .addValue("billingOrder", actor.order())
+                    .addValue("thumb", actor.thumb())
+                    .addValue("tmdbId", actor.tmdbId()));
         }
         return movieId;
     }

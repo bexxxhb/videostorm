@@ -17,6 +17,7 @@ public record ParsedShow(
         String premiered,
         List<ParsedRating> ratings,
         List<String> genres,
+        List<ParsedActor> actors,
         String plot,
         String status,
         String imdbId,
@@ -26,6 +27,7 @@ public record ParsedShow(
     public ParsedShow {
         ratings = ratings == null ? List.of() : List.copyOf(ratings);
         genres = genres == null ? List.of() : List.copyOf(genres);
+        actors = actors == null ? List.of() : List.copyOf(actors);
     }
 
     /**
@@ -34,6 +36,6 @@ public record ParsedShow(
      * downstream supply a folder-derived title, a zero year and an unknown status.
      */
     public static ParsedShow absent() {
-        return new ParsedShow(null, null, null, null, null, null, null, null, null, null);
+        return new ParsedShow(null, null, null, null, null, null, null, null, null, null, null);
     }
 }

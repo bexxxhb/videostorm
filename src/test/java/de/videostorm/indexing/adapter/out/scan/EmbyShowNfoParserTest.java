@@ -1,5 +1,6 @@
 package de.videostorm.indexing.adapter.out.scan;
 
+import de.videostorm.indexing.domain.ParsedActor;
 import de.videostorm.indexing.domain.ParsedRating;
 import de.videostorm.indexing.domain.ParsedShow;
 import org.junit.jupiter.api.Test;
@@ -83,6 +84,43 @@ class EmbyShowNfoParserTest {
         assertThat(show.imdbId()).isNull();
         assertThat(show.ratings()).isEmpty();
         assertThat(show.genres()).isEmpty();
+    }
+
+    @Test
+    void extractsTheCastPreservingBillingOrderAndSkippingNamelessActors() {
+        ParsedShow show = parser.parse("""
+                <tvshow>
+                  <title>Breaking Bad</title>
+                  <actor>
+                    <name>Bryan Cranston</name>
+                    <role>Walter White</role>
+                    <order>0</order>
+                    <thumb>http://image/cranston.jpg</thumb>
+                    <tmdbid>17419</tmdbid>
+                  </actor>
+                  <actor><role>Uncredited</role></actor>
+                  <actor><name>Aaron Paul</name><role>Jesse Pinkman</role></actor>
+                </tvshow>
+                """);
+
+        assertThat(show.actors()).extracting(ParsedActor::name)
+                .containsExactly("Bryan Cranston", "Aaron Paul");
+        ParsedActor lead = show.actors().get(0);
+        assertThat(lead.role()).isEqualTo("Walter White");
+        assertThat(lead.order()).isZero();
+        assertThat(lead.thumb()).isEqualTo("http://image/cranston.jpg");
+        assertThat(lead.tmdbId()).isEqualTo("17419");
+        // The second kept actor omitted <order>; it defaults to its position among kept actors.
+        ParsedActor support = show.actors().get(1);
+        assertThat(support.order()).isEqualTo(1);
+        assertThat(support.tmdbId()).isNull();
+    }
+
+    @Test
+    void hasAnEmptyCastWhenTheShowListsNoActors() {
+        ParsedShow show = parser.parse("<tvshow><title>Castless</title></tvshow>");
+
+        assertThat(show.actors()).isEmpty();
     }
 
     @Test

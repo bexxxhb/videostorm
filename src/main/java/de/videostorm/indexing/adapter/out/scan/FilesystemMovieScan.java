@@ -230,6 +230,9 @@ class FilesystemMovieScan implements SourceScan {
         if (movie.year() == 0) {
             issues.add(RunIssue.missingField(path, movie.title(), RunIssue.YEAR_FIELD));
         }
+        if (movie.actors().isEmpty()) {
+            issues.add(RunIssue.missingField(path, movie.title(), RunIssue.CAST_FIELD));
+        }
     }
 
     private ParsedMovie parseOrAbsent(String raw) {

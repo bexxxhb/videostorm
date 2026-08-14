@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class StagedMovieTest {
 
     private static ParsedMovie parsed(Integer year, List<ParsedRating> ratings, List<String> genres) {
-        return new ParsedMovie("96 Hours - Taken 3", "Taken 3", year, ratings, genres,
+        return new ParsedMovie("96 Hours - Taken 3", "Taken 3", year, ratings, genres, List.of(),
                 109, "A plot.", "Taken Collection", "133352", "tt2446042", null, "260346");
     }
 
@@ -53,7 +53,7 @@ class StagedMovieTest {
 
     @Test
     void fallsBackToTheFolderNameAndFlagsADerivedTitleWhenMetadataHasNone() {
-        ParsedMovie noTitle = new ParsedMovie(null, null, null, List.of(), List.of(),
+        ParsedMovie noTitle = new ParsedMovie(null, null, null, List.of(), List.of(), List.of(),
                 null, null, null, null, null, null, null);
 
         StagedMovie staged = StagedMovie.from(noTitle, "The Blob (1958).mkv", "/p", "x", null);
@@ -76,7 +76,7 @@ class StagedMovieTest {
 
     @Test
     void fallsBackToTheDisplayTitleForIdentityWhenNoOriginalTitle() {
-        ParsedMovie noOriginal = new ParsedMovie("The Thing", null, 1982, List.of(), List.of(),
+        ParsedMovie noOriginal = new ParsedMovie("The Thing", null, 1982, List.of(), List.of(), List.of(),
                 null, null, null, null, null, null, null);
 
         StagedMovie staged = StagedMovie.from(noOriginal, "The Thing (1982)", "/p", "x", null);
@@ -86,7 +86,7 @@ class StagedMovieTest {
 
     @Test
     void identityTitleFallsThroughToTheFolderDerivedTitleWhenNothingWasParsed() {
-        ParsedMovie nothing = new ParsedMovie(null, null, null, List.of(), List.of(),
+        ParsedMovie nothing = new ParsedMovie(null, null, null, List.of(), List.of(), List.of(),
                 null, null, null, null, null, null, null);
 
         StagedMovie staged = StagedMovie.from(nothing, "The Blob (1958).mkv", "/p", "x", null);
@@ -121,5 +121,18 @@ class StagedMovieTest {
 
         assertThat(staged.defaultRating()).isNull();
         assertThat(staged.ratings()).isEmpty();
+    }
+
+    @Test
+    void carriesTheParsedCastThroughInBillingOrder() {
+        ParsedActor lead = new ParsedActor("Liam Neeson", "Bryan Mills", 0, "http://img/neeson.jpg", "3896");
+        ParsedActor support = new ParsedActor("Famke Janssen", "Lenore", 1, null, null);
+        ParsedMovie parsed = new ParsedMovie("96 Hours - Taken 3", "Taken 3", 2014,
+                List.of(), List.of(), List.of(lead, support),
+                109, "A plot.", "Taken Collection", "133352", "tt2446042", null, "260346");
+
+        StagedMovie staged = StagedMovie.from(parsed, "Taken 3", "/p", "x", null);
+
+        assertThat(staged.actors()).containsExactly(lead, support);
     }
 }

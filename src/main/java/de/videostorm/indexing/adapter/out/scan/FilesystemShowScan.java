@@ -149,6 +149,9 @@ class FilesystemShowScan implements SourceScan {
         if (show.year() == 0) {
             issues.add(RunIssue.missingField(path, show.title(), RunIssue.YEAR_FIELD));
         }
+        if (show.actors().isEmpty()) {
+            issues.add(RunIssue.missingField(path, show.title(), RunIssue.CAST_FIELD));
+        }
     }
 
     private ParsedShow parseOrAbsent(String raw) {

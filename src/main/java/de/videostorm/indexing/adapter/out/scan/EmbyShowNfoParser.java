@@ -20,6 +20,7 @@ class EmbyShowNfoParser {
                 EmbyNfo.text(root, "premiered"),
                 EmbyNfo.ratings(root),
                 EmbyNfo.genres(root),
+                EmbyNfo.actors(root),
                 EmbyNfo.text(root, "plot"),
                 EmbyNfo.text(root, "status"),
                 EmbyNfo.uniqueId(root, "imdb"),

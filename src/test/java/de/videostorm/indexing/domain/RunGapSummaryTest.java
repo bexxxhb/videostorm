@@ -53,6 +53,20 @@ class RunGapSummaryTest {
     }
 
     @Test
+    void countsAMissingCastTowardsMissingDataButNotTheTitleOrYearGaps() {
+        List<RunIssue> issues = List.of(
+                RunIssue.missingField("/m/Heat", "Heat", RunIssue.CAST_FIELD),
+                RunIssue.missingField("/m/Dune", "Dune", RunIssue.CAST_FIELD));
+
+        // A missing cast is missing data, so both entries are counted...
+        assertThat(RunGapSummary.distinctMissingDataEntries(issues)).isEqualTo(2);
+        // ...but cast is not one of the two per-field gaps broken out separately.
+        RunGapSummary gaps = RunGapSummary.from(issues);
+        assertThat(gaps.titleGaps()).isZero();
+        assertThat(gaps.yearGaps()).isZero();
+    }
+
+    @Test
     void distinctMissingDataIsZeroWhenThereAreNoIssues() {
         assertThat(RunGapSummary.distinctMissingDataEntries(List.of())).isZero();
     }

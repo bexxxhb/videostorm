@@ -3,6 +3,7 @@ package de.videostorm.indexing.adapter.out.persistence;
 import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.indexing.application.port.out.CataloguePromotion;
 import de.videostorm.indexing.application.port.out.ShowStaging;
+import de.videostorm.indexing.domain.ParsedActor;
 import de.videostorm.indexing.domain.ParsedRating;
 import de.videostorm.indexing.domain.ParsedShow;
 import de.videostorm.indexing.domain.StagedShow;
@@ -26,9 +27,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Sql(statements = {
-        "DELETE FROM show_rating_staging", "DELETE FROM episode_staging", "DELETE FROM show_staging",
-        "DELETE FROM show_rating", "DELETE FROM episode", "DELETE FROM show",
-        "DELETE FROM movie_rating", "DELETE FROM movie"
+        "DELETE FROM show_rating_staging", "DELETE FROM show_actor_staging", "DELETE FROM episode_staging",
+        "DELETE FROM show_staging",
+        "DELETE FROM show_rating", "DELETE FROM show_actor", "DELETE FROM episode", "DELETE FROM show",
+        "DELETE FROM movie_rating", "DELETE FROM movie_actor", "DELETE FROM movie"
 }, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class ShowPromotionIT extends PostgresIntegrationTestBase {
 
@@ -44,8 +46,10 @@ class ShowPromotionIT extends PostgresIntegrationTestBase {
     private static StagedShow sampleShow() {
         ParsedRating tvdb = new ParsedRating("tvdb", new BigDecimal("9.5"), new BigDecimal("10"), 4200, true);
         ParsedRating imdb = new ParsedRating("imdb", new BigDecimal("9.4"), new BigDecimal("10"), 250000, false);
+        ParsedActor lead = new ParsedActor("Bryan Cranston", "Walter White", 0, "http://img/cranston.jpg", "17419");
+        ParsedActor support = new ParsedActor("Aaron Paul", "Jesse Pinkman", 1, null, null);
         ParsedShow parsed = new ParsedShow("Breaking Bad", "Breaking Bad", "2008-01-20",
-                List.of(tvdb, imdb), List.of("Crime", "Drama"), "A plot.", "Ended",
+                List.of(tvdb, imdb), List.of("Crime", "Drama"), List.of(lead, support), "A plot.", "Ended",
                 "tt0903747", "81189", "1396");
         return StagedShow.from(parsed, "Breaking Bad (2008)", "/media/shows/Breaking Bad (2008)", "<tvshow>raw</tvshow>");
     }
@@ -77,6 +81,25 @@ class ShowPromotionIT extends PostgresIntegrationTestBase {
                 WHERE s.id = ? ORDER BY r.id
                 """, stagedId);
         assertThat(ratings).extracting(r -> r.get("source")).containsExactly("tvdb", "imdb");
+    }
+
+    @Test
+    void copiesEveryActorAndTheForeignKeysSurviveTheCopy() {
+        long stagedId = staging.stage(sampleShow());
+
+        promotion.promote(SourceType.SHOWS);
+
+        // Actors are reachable only if their show_id still points at the copied show row; billing order
+        // is preserved and the optional sub-fields carry across, null where the .nfo omitted them.
+        List<Map<String, Object>> actors = jdbc.queryForList("""
+                SELECT a.name, a.role, a.thumb, a.tmdb_id FROM show_actor a JOIN show s ON s.id = a.show_id
+                WHERE s.id = ? ORDER BY a.billing_order
+                """, stagedId);
+        assertThat(actors).extracting(a -> a.get("name")).containsExactly("Bryan Cranston", "Aaron Paul");
+        assertThat(actors.get(0).get("role")).isEqualTo("Walter White");
+        assertThat(actors.get(0).get("tmdb_id")).isEqualTo("17419");
+        assertThat(actors.get(1).get("thumb")).isNull();
+        assertThat(actors.get(1).get("tmdb_id")).isNull();
     }
 
     @Test

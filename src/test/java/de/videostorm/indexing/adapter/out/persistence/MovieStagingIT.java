@@ -2,6 +2,7 @@ package de.videostorm.indexing.adapter.out.persistence;
 
 import de.videostorm.PostgresIntegrationTestBase;
 import de.videostorm.indexing.application.port.out.MovieStaging;
+import de.videostorm.indexing.domain.ParsedActor;
 import de.videostorm.indexing.domain.ParsedMovie;
 import de.videostorm.indexing.domain.ParsedRating;
 import de.videostorm.indexing.domain.StagedMovie;
@@ -26,8 +27,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Sql(statements = {
-        "DELETE FROM movie_rating_staging", "DELETE FROM movie_staging",
-        "DELETE FROM movie_rating", "DELETE FROM movie"
+        "DELETE FROM movie_rating_staging", "DELETE FROM movie_actor_staging", "DELETE FROM movie_staging",
+        "DELETE FROM movie_rating", "DELETE FROM movie_actor", "DELETE FROM movie"
 }, executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 class MovieStagingIT extends PostgresIntegrationTestBase {
 
@@ -40,8 +41,10 @@ class MovieStagingIT extends PostgresIntegrationTestBase {
     private static StagedMovie sampleMovie() {
         ParsedRating tmdb = new ParsedRating("themoviedb", new BigDecimal("6.3"), new BigDecimal("10"), 4200, true);
         ParsedRating imdb = new ParsedRating("imdb", new BigDecimal("6.0"), new BigDecimal("10"), 250000, false);
+        ParsedActor lead = new ParsedActor("Liam Neeson", "Bryan Mills", 0, "http://img/neeson.jpg", "3896");
+        ParsedActor support = new ParsedActor("Famke Janssen", "Lenore", 1, null, null);
         ParsedMovie parsed = new ParsedMovie("96 Hours - Taken 3", "Taken 3", 2014,
-                List.of(tmdb, imdb), List.of("Action", "Thriller"), 109, "A plot.",
+                List.of(tmdb, imdb), List.of("Action", "Thriller"), List.of(lead, support), 109, "A plot.",
                 "Taken Collection", "133352", "tt2446042", null, "260346");
         return StagedMovie.from(parsed, "Taken 3 (2014)", "/media/movies/Taken 3 (2014)", "<movie>raw</movie>", "1080p");
     }
@@ -80,13 +83,32 @@ class MovieStagingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void clearEmptiesBothStagingTables() {
+    void writesEveryActorIntoStagingInBillingOrderWithOptionalFieldsNullable() {
+        long id = staging.stage(sampleMovie());
+
+        List<Map<String, Object>> actors = jdbc.queryForList(
+                "SELECT name, role, billing_order, thumb, tmdb_id FROM movie_actor_staging WHERE movie_id = ? ORDER BY billing_order",
+                id);
+        assertThat(actors).extracting(a -> a.get("name")).containsExactly("Liam Neeson", "Famke Janssen");
+        assertThat(actors.get(0).get("role")).isEqualTo("Bryan Mills");
+        assertThat(actors.get(0).get("billing_order")).isEqualTo(0);
+        assertThat(actors.get(0).get("thumb")).isEqualTo("http://img/neeson.jpg");
+        assertThat(actors.get(0).get("tmdb_id")).isEqualTo("3896");
+        // The supporting actor's optional sub-fields were absent and are stored as null.
+        assertThat(actors.get(1).get("role")).isEqualTo("Lenore");
+        assertThat(actors.get(1).get("thumb")).isNull();
+        assertThat(actors.get(1).get("tmdb_id")).isNull();
+    }
+
+    @Test
+    void clearEmptiesEveryStagingTable() {
         staging.stage(sampleMovie());
 
         staging.clear();
 
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isZero();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_rating_staging", Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_actor_staging", Long.class)).isZero();
     }
 
     @Test

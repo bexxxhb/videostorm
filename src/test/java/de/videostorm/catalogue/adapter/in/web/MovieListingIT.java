@@ -42,6 +42,7 @@ class MovieListingIT extends PostgresIntegrationTestBase {
 
     @BeforeEach
     void clearCatalogue() {
+        jdbcTemplate.update("DELETE FROM movie_actor");
         jdbcTemplate.update("DELETE FROM movie");
     }
 
