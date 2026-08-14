@@ -10,7 +10,8 @@ html(lang="en")
   body
     header.masthead
       a.masthead__brand(href="/") Videostorm
-      a.masthead__link(href="/maintenance") Maintenance
+      if maintenanceEnabled
+        a.masthead__link(href="/maintenance") Maintenance
     nav.tabs
       if activeTab === "movies"
         a.tab.tab--active(href="/movies") Movies

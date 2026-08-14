@@ -1,3 +1,9 @@
+application:
+  operating:
+    # 'presentation' (view-only: maintenance & login disabled and hidden — the default) or
+    # 'maintenance' (full behaviour). Override via the APPLICATION_OPERATING_MODE env var / .env.
+    mode: ${APPLICATION_OPERATING_MODE:presentation}
+
 spring:
   application:
     name: videostorm
