@@ -102,6 +102,7 @@ sources
 ```
 catalogue
 ├── domain
+│   ├── CastMember                          Domain record of one cast member (name, optional role and thumbnail)
 │   ├── GenreList                           Parses/renders Emby's delimiter-padded genre string with a display limit
 │   ├── Movie                               Domain record of the movie subset shown in listings
 │   ├── Rating                              Provider rating value with display label
@@ -111,7 +112,9 @@ catalogue
 │   ├── TitleNormalizer                     Lowercase, strip diacritics, collapse non-alphanumerics
 │   └── Year                                Release-year value object with explicit unknown (0) state
 ├── application
+│   ├── FetchMovieCastService               Reads one movie's cast behind the inbound port
 │   ├── FetchMovieRawNfoService             Reads one movie's raw .nfo behind the inbound port
+│   ├── FetchShowCastService                Reads one show's cast behind the inbound port
 │   ├── FetchShowRawNfoService              Reads one show's raw .nfo behind the inbound port
 │   ├── ListMoviesService                   Paginates and searches movies with page-clamping
 │   ├── ListShowsService                    Paginates and searches shows with page-clamping
@@ -126,31 +129,37 @@ catalogue
 │       ├── in
 │       │   ├── ListMoviesQuery             Inbound port for listing movies
 │       │   ├── ListShowsQuery              Inbound port for listing shows
+│       │   ├── MovieCastQuery              Inbound port for reading one movie's cast on demand
 │       │   ├── MovieRawNfoQuery            Inbound port for reading one movie's raw .nfo on demand
+│       │   ├── ShowCastQuery               Inbound port for reading one show's cast on demand
 │       │   └── ShowRawNfoQuery             Inbound port for reading one show's raw .nfo on demand
 │       └── out
-│           ├── MovieRepository             Outbound port for reading/counting movies
-│           └── ShowRepository              Outbound port for reading/counting shows
+│           ├── MovieRepository             Outbound port for reading/counting movies and reading one movie's cast
+│           └── ShowRepository              Outbound port for reading/counting shows and reading one show's cast
 └── adapter
     ├── in.web
+    │   ├── ActorResponse                   JSON view of one actor (name, role, https-normalized thumbnail) for the layer
+    │   ├── MovieCastController             Serves one movie's cast on demand as JSON; 404 when the movie is unknown
     │   ├── MovieListingController          Public GET controller rendering the movie listing page
     │   ├── MovieRawNfoController           Serves one movie's raw .nfo on demand as plain text; 404 when absent
     │   ├── MovieRow                        Display-ready JavaBean adapting a Movie for the template
     │   ├── MovieSortView                   Per-column SortHeaders plus the active sort as params for the movies form
     │   ├── PaginationLinks                 Computes first/prev/next/last URLs preserving the query
+    │   ├── ShowCastController              Serves one show's cast on demand as JSON; 404 when the show is unknown
     │   ├── ShowListingController           Public GET controller rendering the show listing page
     │   ├── ShowRawNfoController            Serves one show's raw .nfo on demand as plain text; 404 when absent
     │   ├── ShowRow                         Display-ready JavaBean adapting a Show for the template
     │   ├── ShowSortView                    Per-column SortHeaders plus the active sort as params for the shows form
     │   └── SortHeader                      One sortable column's toggle link and ▲/▼/↕ direction marker
     └── out.persistence
+        ├── CastRow                         Projection over movie_actor/show_actor mapping a cast row to a CastMember
         ├── ListingSort                     Builds the paging Sort: chosen column, nulls last, id tiebreak
         ├── MovieEntity                     JPA entity for the movie table (read path)
         ├── MovieJpaRepository              Spring Data repository with the shared movie search predicate
-        ├── MovieRepositoryAdapter          Adapts the JPA repo to the port, escaping LIKE terms
+        ├── MovieRepositoryAdapter          Adapts the JPA repo to the port, escaping LIKE terms; reads cast in billing order
         ├── ShowEntity                      JPA entity for the show table (read path)
         ├── ShowJpaRepository               Spring Data repository with the shared show search predicate
-        └── ShowRepositoryAdapter           Adapts the JPA repo to the port, escaping LIKE terms
+        └── ShowRepositoryAdapter           Adapts the JPA repo to the port, escaping LIKE terms; reads cast in billing order
 ```
 
 ### `indexing` — the scan/ingest side
@@ -167,6 +176,7 @@ indexing
 │   ├── FeatureSelection                    Picks a folder's feature video by prefix/size/name; lists ignored
 │   ├── FeatureVideo                        Min-size rule (500 MB) separating a feature film from clips/samples
 │   ├── IndexingRun                         Immutable run aggregate with lifecycle transitions
+│   ├── ParsedActor                         One parsed <actor>: name, optional role, billing order and thumbnail
 │   ├── ParsedEpisodeNumber                 Parsed season number and episode number
 │   ├── ParsedMovie                         Raw Emby movie fields from one .nfo (nullable, with absent())
 │   ├── ParsedRating                        One parsed .nfo rating: source, value, max, votes, default
@@ -184,8 +194,8 @@ indexing
 │   ├── SeasonNumber                        Non-negative season value; 0 is Specials
 │   ├── Slug                                Identity slug from normalized title plus year
 │   ├── StagedEpisode                       Episode season/episode numbers ready for staging
-│   ├── StagedMovie                         Movie parsed fields plus catalogue derivations, ready to stage
-│   ├── StagedShow                          Show parsed fields plus catalogue derivations, ready to stage
+│   ├── StagedMovie                         Movie parsed fields plus catalogue derivations and cast, ready to stage
+│   ├── StagedShow                          Show parsed fields plus catalogue derivations and cast, ready to stage
 │   └── TechnicalTokens                     Strips extension and release/codec/resolution tokens from a name
 ├── application
 │   ├── IndexingService                     Owns the run lifecycle: preflight, background scan, promote, settle
@@ -216,11 +226,11 @@ indexing
         │   ├── IndexingRunEntity           JPA entity for the indexing_run table
         │   ├── IndexingRunJpaRepository    Spring Data repo querying runs by status and start order
         │   ├── IndexingRunRepositoryAdapter Adapts the JPA repo to the port, mapping to/from IndexingRun
-        │   ├── JdbcMoviePromotion          Transactionally swaps staged movies into live movie tables
-        │   ├── JdbcMovieStaging            Writes movies and ratings into staging, each in its own txn
+        │   ├── JdbcMoviePromotion          Transactionally swaps staged movies and cast into live movie tables
+        │   ├── JdbcMovieStaging            Writes movies, ratings and cast into staging, each in its own txn
         │   ├── JdbcRunIssueRepository      Batch-writes, reads and prunes per-run issue detail
-        │   ├── JdbcShowPromotion           Transactionally swaps staged shows/episodes into live tables
-        │   ├── JdbcShowStaging             Writes shows, ratings and episodes into staging
+        │   ├── JdbcShowPromotion           Transactionally swaps staged shows, episodes and cast into live tables
+        │   ├── JdbcShowStaging             Writes shows, ratings, episodes and cast into staging
         │   └── RoutingCataloguePromotion   Dispatches promotion to the CataloguePromotor for the type
         └── scan
             ├── EmbyMovieNfoParser          Parses an Emby movie .nfo into a ParsedMovie
@@ -251,8 +261,11 @@ their routes are denied, so nothing here is reachable; in `maintenance` mode it 
 
 Templates live under `src/main/resources/templates` — `layout.pug` (the shared shell),
 `movies.pug` and `shows.pug` (public listings), and `login.pug` and `maintenance.pug` (the admin
-area, rendered only in `maintenance` mode) — with static assets (`css/`, `js/`) in
-`src/main/resources/static`.
+area, rendered only in `maintenance` mode) — with static assets (`css/`, `js/`, `img/`) in
+`src/main/resources/static`. The listings keep their per-row detail out of the initial page: the
+shared `content-dialog` (wired by `js/content-dialog.js`) opens a title's Plot inline and fetches
+its raw `.nfo` and its cast (the "Actors" layer) on demand, the cast rendered from JSON as a block
+per performer with the bundled `img/no-actor.svg` placeholder when a portrait is missing.
 
 Schema changes are Flyway migrations under `src/main/resources/db/migration`. Hibernate never
 generates DDL.
