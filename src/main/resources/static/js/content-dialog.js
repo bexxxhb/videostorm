@@ -26,14 +26,15 @@
     }
 
     // `mode` selects the body layout: "code" renders monospace with whitespace preserved (raw .nfo XML),
-    // "actors" renders the cast as a grid of blocks, and anything else is wrapped prose (the plot). The
-    // wider dialog is shared by the code and actors modes, which both need the room.
+    // "actors" renders the cast as a grid of blocks, "duplicates" lists duplicate groups, and anything
+    // else is wrapped prose (the plot). The wider dialog is shared by the modes that need the room.
     function open(title, mode) {
         requestToken++;
         titleEl.textContent = title || "";
         bodyEl.classList.toggle("content-dialog__body--code", mode === "code");
         bodyEl.classList.toggle("content-dialog__body--actors", mode === "actors");
-        dialog.classList.toggle("content-dialog--wide", mode === "code" || mode === "actors");
+        bodyEl.classList.toggle("content-dialog__body--duplicates", mode === "duplicates");
+        dialog.classList.toggle("content-dialog--wide", mode === "code" || mode === "actors" || mode === "duplicates");
         dialog.showModal();
         return requestToken;
     }
@@ -73,6 +74,40 @@
         });
     }
 
+    // Builds one block per duplicate group: a heading naming the criterion and the value the movies
+    // share, then a row per member listing its IMDb id, original title and file path. A missing
+    // attribute shows as a dash. Every value goes in via textContent, so nothing in a payload is markup.
+    function renderDuplicateGroups(groups) {
+        bodyEl.textContent = "";
+        if (!groups.length) {
+            bodyEl.textContent = "No duplicates found.";
+            return;
+        }
+        groups.forEach(function (group) {
+            var block = document.createElement("div");
+            block.className = "dup-group";
+
+            var heading = document.createElement("div");
+            heading.className = "dup-group__heading";
+            heading.textContent = group.criterion + ": " + group.sharedValue;
+            block.appendChild(heading);
+
+            group.members.forEach(function (member) {
+                var row = document.createElement("div");
+                row.className = "dup-member";
+                [member.imdbId, member.originalTitle, member.filePath].forEach(function (value) {
+                    var cell = document.createElement("div");
+                    cell.className = "dup-member__cell";
+                    cell.textContent = value || "—";
+                    row.appendChild(cell);
+                });
+                block.appendChild(row);
+            });
+
+            bodyEl.appendChild(block);
+        });
+    }
+
     document.querySelectorAll(".plot-link").forEach(function (link) {
         link.addEventListener("click", function (event) {
             event.preventDefault();
@@ -101,6 +136,31 @@
                 .catch(function () {
                     if (token === requestToken) {
                         bodyEl.textContent = "Could not load the cast.";
+                    }
+                });
+        });
+    });
+
+    document.querySelectorAll(".duplicates-link").forEach(function (link) {
+        link.addEventListener("click", function (event) {
+            event.preventDefault();
+            var token = open(link.getAttribute("data-title"), "duplicates");
+            bodyEl.textContent = "Loading…";
+            fetch(link.href, {headers: {"Accept": "application/json"}})
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error("status " + response.status);
+                    }
+                    return response.json();
+                })
+                .then(function (groups) {
+                    if (token === requestToken) {
+                        renderDuplicateGroups(groups);
+                    }
+                })
+                .catch(function () {
+                    if (token === requestToken) {
+                        bodyEl.textContent = "Could not load the duplicates.";
                     }
                 });
         });

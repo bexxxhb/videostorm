@@ -41,6 +41,31 @@ block content
       li.gaps__item Missing title: #{titleGaps}
       li.gaps__item Missing year: #{yearGaps}
 
+  section.duplicates
+    h2 Duplicate movies
+    form.form(method="post", action="/maintenance/duplicates/scan")
+      input(type="hidden", name=csrfParameterName, value=csrfToken)
+      button.button(type="submit") Scan for duplicate movies
+    if hasDuplicateScans
+      table.duplicates__table
+        thead
+          tr
+            th Executed
+            th Duration
+            th Groups
+            th Duplicates
+        tbody
+          each scan in duplicateScans
+            tr
+              td= scan.executedAt
+              td= scan.duration
+              td= scan.groupCount
+              td
+                if scan.hasGroups
+                  a.duplicates-link(href="/maintenance/duplicate-scans/" + scan.id + "/groups", data-title="Duplicate movies — " + scan.executedAt) View duplicates
+    else
+      p.duplicates__empty No duplicate scans yet.
+
   section.history
     h2 Run history
     if hasRuns

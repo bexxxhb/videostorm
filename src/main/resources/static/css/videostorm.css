@@ -325,3 +325,58 @@ body {
 .history__empty {
     color: #6b6b6b;
 }
+
+.duplicates {
+    margin-top: 1.5rem;
+}
+
+.duplicates__table {
+    width: 100%;
+    max-width: 48rem;
+    border-collapse: collapse;
+    margin-top: 0.75rem;
+}
+
+.duplicates__table th,
+.duplicates__table td {
+    padding: 0.4rem 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--rule);
+}
+
+.duplicates__table thead th {
+    border-bottom: 2px solid var(--rule);
+    font-weight: 600;
+}
+
+.duplicates__empty {
+    color: #6b6b6b;
+    margin-top: 0.75rem;
+}
+
+/* Duplicates variant: a stack of group blocks, each headed by the shared value and listing its
+   member movies as rows of IMDb id / original title / file path. */
+.content-dialog__body--duplicates {
+    white-space: normal;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.dup-group__heading {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--rule);
+}
+
+.dup-member {
+    display: grid;
+    grid-template-columns: 10rem 1fr 2fr;
+    gap: 0.75rem;
+    padding: 0.25rem 0;
+}
+
+.dup-member__cell {
+    overflow-wrap: anywhere;
+}

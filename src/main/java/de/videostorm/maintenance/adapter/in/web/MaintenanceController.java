@@ -6,6 +6,8 @@ import de.videostorm.indexing.application.port.in.RunReports;
 import de.videostorm.indexing.application.port.in.TriggerReindex;
 import de.videostorm.indexing.application.port.in.TriggerResult;
 import de.videostorm.indexing.domain.RunGapSummary;
+import de.videostorm.maintenance.application.port.in.DuplicateScanReports;
+import de.videostorm.maintenance.application.port.in.TriggerDuplicateScan;
 import de.videostorm.sources.domain.SourcePaths;
 import de.videostorm.sources.domain.SourceType;
 import jakarta.servlet.http.HttpServletRequest;
@@ -53,13 +55,19 @@ public class MaintenanceController {
     private final TriggerReindex triggerReindex;
     private final IndexingStatus indexingStatus;
     private final RunReports runReports;
+    private final TriggerDuplicateScan triggerDuplicateScan;
+    private final DuplicateScanReports duplicateScanReports;
 
     public MaintenanceController(SourcePaths sourcePaths, TriggerReindex triggerReindex,
-                                 IndexingStatus indexingStatus, RunReports runReports) {
+                                 IndexingStatus indexingStatus, RunReports runReports,
+                                 TriggerDuplicateScan triggerDuplicateScan,
+                                 DuplicateScanReports duplicateScanReports) {
         this.sourcePaths = sourcePaths;
         this.triggerReindex = triggerReindex;
         this.indexingStatus = indexingStatus;
         this.runReports = runReports;
+        this.triggerDuplicateScan = triggerDuplicateScan;
+        this.duplicateScanReports = duplicateScanReports;
     }
 
     @GetMapping("/maintenance")
@@ -79,6 +87,10 @@ public class MaintenanceController {
 
         RunGapSummary gaps = runReports.lastRunGaps();
 
+        List<DuplicateScanRunView> duplicateScans = duplicateScanReports.history().stream()
+                .map(DuplicateScanRunView::of)
+                .toList();
+
         model.addAttribute("moviesConfigured", sourcePaths.hasPathsFor(SourceType.MOVIES));
         model.addAttribute("showsConfigured", sourcePaths.hasPathsFor(SourceType.SHOWS));
         model.addAttribute("runActive", runActive);
@@ -87,6 +99,8 @@ public class MaintenanceController {
         model.addAttribute("hasRuns", !history.isEmpty());
         model.addAttribute("titleGaps", gaps.titleGaps());
         model.addAttribute("yearGaps", gaps.yearGaps());
+        model.addAttribute("duplicateScans", duplicateScans);
+        model.addAttribute("hasDuplicateScans", !duplicateScans.isEmpty());
         if (runActive) {
             model.addAttribute("metaRefreshSeconds", META_REFRESH_SECONDS);
         }
@@ -113,6 +127,12 @@ public class MaintenanceController {
     @PostMapping("/maintenance/shows/reindex")
     public String reindexShows(RedirectAttributes redirectAttributes) {
         return trigger(SourceType.SHOWS, redirectAttributes);
+    }
+
+    @PostMapping("/maintenance/duplicates/scan")
+    public String scanForDuplicates() {
+        triggerDuplicateScan.scan();
+        return "redirect:/maintenance";
     }
 
     private String trigger(SourceType type, RedirectAttributes redirectAttributes) {

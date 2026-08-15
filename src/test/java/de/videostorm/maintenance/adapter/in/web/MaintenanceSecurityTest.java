@@ -9,6 +9,8 @@ import de.videostorm.indexing.application.port.in.IndexingStatus;
 import de.videostorm.indexing.application.port.in.RunReports;
 import de.videostorm.indexing.application.port.in.TriggerReindex;
 import de.videostorm.indexing.domain.RunGapSummary;
+import de.videostorm.maintenance.application.port.in.DuplicateScanReports;
+import de.videostorm.maintenance.application.port.in.TriggerDuplicateScan;
 import de.videostorm.sources.config.SourcesConfiguration;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -60,11 +62,18 @@ class MaintenanceSecurityTest {
     @MockitoBean
     private RunReports runReports;
 
+    @MockitoBean
+    private TriggerDuplicateScan triggerDuplicateScan;
+
+    @MockitoBean
+    private DuplicateScanReports duplicateScanReports;
+
     @BeforeEach
     void noRunsByDefault() {
         Mockito.when(indexingStatus.overview()).thenReturn(IndexingOverview.from(List.of()));
         Mockito.when(runReports.lastRunGaps()).thenReturn(RunGapSummary.none());
         Mockito.when(runReports.downloadableRunIds()).thenReturn(java.util.Set.of());
+        Mockito.when(duplicateScanReports.history()).thenReturn(List.of());
     }
 
     @Test
@@ -119,9 +128,11 @@ class MaintenanceSecurityTest {
 
         assertThat(html).contains("action=\"/maintenance/movies/reindex\"");
         assertThat(html).contains("action=\"/maintenance/shows/reindex\"");
+        assertThat(html).contains("action=\"/maintenance/duplicates/scan\"");
         assertThat(html).containsPattern("<button[^>]*\\bdisabled\\b[^>]*>Re-index movies</button>");
         assertThat(html).containsPattern("<button[^>]*\\bdisabled\\b[^>]*>Re-index shows</button>");
-        assertThat(countOccurrences(html, "type=\"hidden\"")).isEqualTo(3);
+        // Logout, the two re-index triggers and the duplicate-scan trigger — each CSRF-protected.
+        assertThat(countOccurrences(html, "type=\"hidden\"")).isEqualTo(4);
     }
 
     private static int countOccurrences(String haystack, String needle) {
