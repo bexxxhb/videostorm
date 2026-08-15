@@ -35,10 +35,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ShowScanIT extends PostgresIntegrationTestBase {
 
     private static final Path SHOWS_DIR = createTempLibrary();
+    private static final Path SECOND_SHOWS_DIR = createTempLibrary();
 
     @DynamicPropertySource
     static void showSource(DynamicPropertyRegistry registry) {
-        registry.add("videostorm.sources.shows", SHOWS_DIR::toString);
+        registry.add("videostorm.sources.shows", () -> SHOWS_DIR + "," + SECOND_SHOWS_DIR);
     }
 
     @Autowired
@@ -66,7 +67,8 @@ class ShowScanIT extends PostgresIntegrationTestBase {
         jdbc.update("DELETE FROM movie_rating");
         jdbc.update("DELETE FROM movie_actor");
         jdbc.update("DELETE FROM movie");
-        emptyLibrary();
+        emptyLibrary(SHOWS_DIR);
+        emptyLibrary(SECOND_SHOWS_DIR);
     }
 
     @Test
@@ -309,6 +311,19 @@ class ShowScanIT extends PostgresIntegrationTestBase {
         assertThat(episodesOf("odd naming")).isEmpty();
     }
 
+    @Test
+    void cataloguesShowsFromEveryConfiguredSourceRoot() {
+        showFolder("Breaking Bad (2008)", "<tvshow><title>Breaking Bad</title></tvshow>");
+        showFolderIn(SECOND_SHOWS_DIR, "The Wire (2002)", "<tvshow><title>The Wire</title></tvshow>");
+
+        RunCounts counts = scan.scan(SourceType.SHOWS).counts();
+
+        assertThat(counts).isEqualTo(new RunCounts(2, 2));
+        assertThat(jdbc.queryForList("SELECT title FROM show_staging"))
+                .extracting(row -> row.get("title"))
+                .containsExactlyInAnyOrder("Breaking Bad", "The Wire");
+    }
+
     /** The episodes staged for a show as {@code S<season>E<episode>}, ordered by season then episode. */
     private List<String> episodesOf(String normalizedTitle) {
         return jdbc.query("""
@@ -332,7 +347,11 @@ class ShowScanIT extends PostgresIntegrationTestBase {
     }
 
     private Path createFolder(String name) {
-        Path folder = SHOWS_DIR.resolve(name);
+        return createFolderIn(SHOWS_DIR, name);
+    }
+
+    private Path createFolderIn(Path root, String name) {
+        Path folder = root.resolve(name);
         try {
             Files.createDirectories(folder);
         } catch (IOException e) {
@@ -342,7 +361,11 @@ class ShowScanIT extends PostgresIntegrationTestBase {
     }
 
     private Path showFolder(String name, String nfo) {
-        Path folder = createFolder(name);
+        return showFolderIn(SHOWS_DIR, name, nfo);
+    }
+
+    private Path showFolderIn(Path root, String name, String nfo) {
+        Path folder = createFolderIn(root, name);
         write(folder.resolve("tvshow.nfo"), nfo);
         return folder;
     }
@@ -355,9 +378,9 @@ class ShowScanIT extends PostgresIntegrationTestBase {
         }
     }
 
-    private void emptyLibrary() {
-        try (Stream<Path> walk = Files.walk(SHOWS_DIR)) {
-            List<Path> toDelete = walk.filter(path -> !path.equals(SHOWS_DIR))
+    private void emptyLibrary(Path root) {
+        try (Stream<Path> walk = Files.walk(root)) {
+            List<Path> toDelete = walk.filter(path -> !path.equals(root))
                     .sorted(Comparator.reverseOrder())
                     .toList();
             for (Path path : toDelete) {

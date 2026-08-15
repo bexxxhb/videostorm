@@ -38,8 +38,8 @@ services:
       VIDEOSTORM_ADMIN_USERNAME: ${VIDEOSTORM_ADMIN_USERNAME:-admin}
       VIDEOSTORM_ADMIN_PASSWORD: ${VIDEOSTORM_ADMIN_PASSWORD:-changeme}
       # Comma-separated source paths, inside the container. They must match the mounts below.
-      VIDEOSTORM_SOURCES_MOVIES: ${VIDEOSTORM_SOURCES_MOVIES:-/media/movies}
-      VIDEOSTORM_SOURCES_SHOWS: ${VIDEOSTORM_SOURCES_SHOWS:-/media/shows}
+      VIDEOSTORM_SOURCES_MOVIES: ${VIDEOSTORM_SOURCES_MOVIES:-/media/movies-1,/media/movies-2,/media/movies-3,/media/movies-4,/media/movies-5}
+      VIDEOSTORM_SOURCES_SHOWS: ${VIDEOSTORM_SOURCES_SHOWS:-/media/shows-1,/media/shows-2,/media/shows-3}
     volumes:
       # The library is bind-mounted read-only: the catalogue can never modify or delete it.
       #
@@ -50,14 +50,48 @@ services:
       # the container when the NAS (re)mounts on the host after the container has already started.
       # 'create_host_path: false' stops Compose fabricating an empty stub that would mask an
       # offline share.
+      #
+      # Up to 5 movie roots and 3 show roots, numbered 1..N. An unused slot defaults to an empty
+      # local folder; VIDEOSTORM_SOURCES_MOVIES/SHOWS above can also be overridden to list fewer
+      # container paths if some slots aren't in use.
       - type: bind
-        source: ${VIDEOSTORM_MOVIES_HOST:-./media/movies}
-        target: /media/movies
+        source: ${VIDEOSTORM_MOVIES_HOST_1:-./media/movies-1}
+        target: /media/movies-1
         read_only: true
         bind: { create_host_path: false, propagation: rslave }
       - type: bind
-        source: ${VIDEOSTORM_SHOWS_HOST:-./media/shows}
-        target: /media/shows
+        source: ${VIDEOSTORM_MOVIES_HOST_2:-./media/movies-2}
+        target: /media/movies-2
+        read_only: true
+        bind: { create_host_path: false, propagation: rslave }
+      - type: bind
+        source: ${VIDEOSTORM_MOVIES_HOST_3:-./media/movies-3}
+        target: /media/movies-3
+        read_only: true
+        bind: { create_host_path: false, propagation: rslave }
+      - type: bind
+        source: ${VIDEOSTORM_MOVIES_HOST_4:-./media/movies-4}
+        target: /media/movies-4
+        read_only: true
+        bind: { create_host_path: false, propagation: rslave }
+      - type: bind
+        source: ${VIDEOSTORM_MOVIES_HOST_5:-./media/movies-5}
+        target: /media/movies-5
+        read_only: true
+        bind: { create_host_path: false, propagation: rslave }
+      - type: bind
+        source: ${VIDEOSTORM_SHOWS_HOST_1:-./media/shows-1}
+        target: /media/shows-1
+        read_only: true
+        bind: { create_host_path: false, propagation: rslave }
+      - type: bind
+        source: ${VIDEOSTORM_SHOWS_HOST_2:-./media/shows-2}
+        target: /media/shows-2
+        read_only: true
+        bind: { create_host_path: false, propagation: rslave }
+      - type: bind
+        source: ${VIDEOSTORM_SHOWS_HOST_3:-./media/shows-3}
+        target: /media/shows-3
         read_only: true
         bind: { create_host_path: false, propagation: rslave }
     ports:

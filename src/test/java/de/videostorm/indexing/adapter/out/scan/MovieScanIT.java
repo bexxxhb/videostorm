@@ -36,10 +36,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MovieScanIT extends PostgresIntegrationTestBase {
 
     private static final Path MOVIES_DIR = createTempLibrary();
+    private static final Path SECOND_MOVIES_DIR = createTempLibrary();
 
     @DynamicPropertySource
     static void movieSource(DynamicPropertyRegistry registry) {
-        registry.add("videostorm.sources.movies", MOVIES_DIR::toString);
+        registry.add("videostorm.sources.movies", () -> MOVIES_DIR + "," + SECOND_MOVIES_DIR);
     }
 
     @Autowired
@@ -56,7 +57,8 @@ class MovieScanIT extends PostgresIntegrationTestBase {
         jdbc.update("DELETE FROM movie_rating");
         jdbc.update("DELETE FROM movie_actor");
         jdbc.update("DELETE FROM movie");
-        emptyLibrary();
+        emptyLibrary(MOVIES_DIR);
+        emptyLibrary(SECOND_MOVIES_DIR);
     }
 
     @Test
@@ -391,8 +393,25 @@ class MovieScanIT extends PostgresIntegrationTestBase {
         assertThat(jdbc.queryForObject("SELECT title FROM movie_staging", String.class)).isEqualTo("Mad Max");
     }
 
+    @Test
+    void cataloguesMoviesFromEveryConfiguredSourceRoot() {
+        movieFolder("Heat (1995)", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
+        movieFolderIn(SECOND_MOVIES_DIR, "Dune (2021)", "<movie><title>Dune</title><year>2021</year></movie>", "dune.mkv");
+
+        RunCounts counts = scan.scan(SourceType.MOVIES).counts();
+
+        assertThat(counts).isEqualTo(new RunCounts(2, 2));
+        assertThat(jdbc.queryForList("SELECT title FROM movie_staging"))
+                .extracting(row -> row.get("title"))
+                .containsExactlyInAnyOrder("Heat", "Dune");
+    }
+
     private Path createFolder(String name) {
-        Path folder = MOVIES_DIR.resolve(name);
+        return createFolderIn(MOVIES_DIR, name);
+    }
+
+    private Path createFolderIn(Path root, String name) {
+        Path folder = root.resolve(name);
         try {
             Files.createDirectories(folder);
         } catch (IOException e) {
@@ -402,7 +421,11 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     }
 
     private Path movieFolder(String name, String nfo, String videoFile) {
-        Path folder = createFolder(name);
+        return movieFolderIn(MOVIES_DIR, name, nfo, videoFile);
+    }
+
+    private Path movieFolderIn(Path root, String name, String nfo, String videoFile) {
+        Path folder = createFolderIn(root, name);
         write(folder.resolve("movie.nfo"), nfo);
         largeVideo(folder.resolve(videoFile));
         return folder;
@@ -429,9 +452,9 @@ class MovieScanIT extends PostgresIntegrationTestBase {
         }
     }
 
-    private void emptyLibrary() {
-        try (Stream<Path> walk = Files.walk(MOVIES_DIR)) {
-            List<Path> toDelete = walk.filter(path -> !path.equals(MOVIES_DIR))
+    private void emptyLibrary(Path root) {
+        try (Stream<Path> walk = Files.walk(root)) {
+            List<Path> toDelete = walk.filter(path -> !path.equals(root))
                     .sorted(Comparator.reverseOrder())
                     .toList();
             for (Path path : toDelete) {

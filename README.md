@@ -34,21 +34,25 @@ purely via `.env` with no rebuild:
 The library lives behind read-only bind mounts. Point the host paths at your library and, if the
 container process needs a specific identity to read them, set the uid and gid:
 
-- `VIDEOSTORM_MOVIES_HOST` / `VIDEOSTORM_SHOWS_HOST` — host directories to mount (default
-  `./media/movies`, `./media/shows`), mounted read-only at `/media/movies` and `/media/shows`.
-  For a network library (NAS/SMB/NFS), point these at the **mount points** — the host directories
-  the shares mount onto — not at paths inside the shares. A mount point stays present-but-empty
-  while its share is offline, so the container still starts; the compose mounts use
+- `VIDEOSTORM_MOVIES_HOST_1` .. `_5` / `VIDEOSTORM_SHOWS_HOST_1` .. `_3` — host directories to mount,
+  one per source root (default `./media/movies-1` .. `-5`, `./media/shows-1` .. `-3`), mounted
+  read-only at `/media/movies-1` .. `-5` and `/media/shows-1` .. `-3` respectively. Compose wires up
+  to 5 movie roots and 3 show roots by default; a slot you don't need can be left at its empty
+  default folder. For a network library (NAS/SMB/NFS), point these at the **mount points** — the host
+  directories the shares mount onto — not at paths inside the shares. A mount point stays
+  present-but-empty while its share is offline, so the container still starts; the compose mounts use
   `create_host_path: false` (no masking stub is fabricated) and `propagation: rslave` (a share that
   (re)mounts on the host after the container started surfaces inside it). When a share is absent the
   container sees an empty directory and a re-index aborts without touching the catalogue, rather
   than the daemon refusing to start the container.
 - `VIDEOSTORM_SOURCES_MOVIES` / `VIDEOSTORM_SOURCES_SHOWS` — comma-separated absolute paths the
-  application indexes, **inside** the container; they must match the mounts (default
-  `/media/movies`, `/media/shows`). Entries are trimmed and normalised; startup fails, naming the
-  offending pair, if any two overlap or a path is not absolute. A type with no configured paths
-  does not block startup — its re-index trigger is simply shown disabled. Configured paths are
-  logged with their reachability at startup and never rendered in the UI.
+  application indexes, **inside** the container; they must match the mounts (default the 5
+  `/media/movies-N` paths and the 3 `/media/shows-N` paths above). The list accepts any number of
+  entries — 5 and 3 are simply what compose wires by default, not an enforced limit. Entries are
+  trimmed and normalised; startup fails, naming the offending pair, if any two overlap or a path is
+  not absolute. A type with no configured paths does not block startup — its re-index trigger is
+  simply shown disabled. Configured paths are logged with their reachability at startup and never
+  rendered in the UI.
 - `PUID` / `PGID` — uid and gid the container runs as (default `1000`), so it can read files owned
   by your host account.
 
@@ -96,8 +100,7 @@ de.videostorm
 sources
 ├── config
 │   ├── SourcePathReachabilityLogger        Logs existence/readability of each configured path once at startup
-│   ├── SourcesConfiguration                Builds the validated SourcePaths bean from raw properties
-│   └── SourcesProperties                   Binds comma-separated movie/show path config, nulls → empty
+│   └── SourcesConfiguration                Builds the validated SourcePaths bean from the comma-separated movie/show path properties
 └── domain
     ├── SourcePath                          Normalized absolute source location with ancestor-prefix checks
     ├── SourcePaths                         Validated per-type paths rejecting duplicates and nested overlaps
