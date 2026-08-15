@@ -41,3 +41,4 @@ Issues live in GitHub Issues for `bexxxhb/videostorm`, via the `gh` CLI. See `do
 - DO NOT output changed lines in code files into the session window
 - DO NOT output bash command output into the session window, use temporary files
 - DO NOT output diff command results into the session window, use temporary files
+- DO NOT output the implementation plan of a ticket into the session window. Use a temporary file for that.
