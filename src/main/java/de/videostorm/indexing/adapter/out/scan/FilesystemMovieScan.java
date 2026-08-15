@@ -2,7 +2,6 @@ package de.videostorm.indexing.adapter.out.scan;
 
 import de.videostorm.indexing.application.port.out.MovieStaging;
 import de.videostorm.indexing.domain.DerivedTitle;
-import de.videostorm.indexing.domain.DuplicateGuard;
 import de.videostorm.indexing.domain.FeatureSelection;
 import de.videostorm.indexing.domain.FeatureVideo;
 import de.videostorm.indexing.domain.ParsedMovie;
@@ -28,7 +27,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
@@ -53,10 +51,10 @@ import java.util.stream.Stream;
  * becomes a {@link RunIssue} on the returned {@link ScanReport}, so the run can report what was thin
  * without anything disappearing silently.
  *
- * <p>A {@link DuplicateGuard} spanning the whole run catches the same film appearing in two folders:
- * the first is staged, the second is skipped and recorded as a duplicate naming both locations. A
- * duplicate never aborts the run, and two films that merely share a title but differ in year are both
- * catalogued.
+ * <p>Duplicates are not de-duplicated: the same film appearing in two folders is catalogued twice, on
+ * purpose. The source filesystems unavoidably contain doubled entries, and the duplicate-movie scan
+ * (issue #47) exists to reveal those doubles in the catalogue so they can be removed deliberately —
+ * which it can only do if the second copy is actually stored rather than skipped at index time.
  *
  * <p>Folder and file order is the deterministic codepoint sort, so "the first {@code .nfo}" is a
  * stable choice regardless of the filesystem's own ordering. This adapter scans movies only; shows
@@ -99,7 +97,6 @@ class FilesystemMovieScan implements SourceScan {
 
         Tally tally = new Tally();
         List<RunIssue> issues = new ArrayList<>();
-        DuplicateGuard duplicates = new DuplicateGuard();
         for (SourcePath sourcePath : sourcePaths.pathsFor(SourceType.MOVIES)) {
             Path root = Path.of(sourcePath.value());
             if (!Files.isDirectory(root)) {
@@ -107,7 +104,7 @@ class FilesystemMovieScan implements SourceScan {
                 continue;
             }
             for (Path child : sortedChildDirectories(root)) {
-                scanDirectory(child, 1, duplicates, issues, tally);
+                scanDirectory(child, 1, issues, tally);
             }
         }
         log.info("Movie scan found {} movies, staged {}, skipped {}, recorded {} issues",
@@ -120,8 +117,7 @@ class FilesystemMovieScan implements SourceScan {
      * depth cap. A directory with a feature-sized video is a movie and a leaf; one with only smaller
      * videos is skipped; one with none is a container the walk descends through.
      */
-    private void scanDirectory(Path dir, int level, DuplicateGuard duplicates,
-                               List<RunIssue> issues, Tally tally) {
+    private void scanDirectory(Path dir, int level, List<RunIssue> issues, Tally tally) {
         List<Path> files = sortedRegularFiles(dir);
         List<FeatureSelection.Video> videos = files.stream()
                 .filter(file -> RecognizedVideo.isVideoFile(file.getFileName().toString()))
@@ -133,9 +129,8 @@ class FilesystemMovieScan implements SourceScan {
 
         if (!features.isEmpty()) {
             tally.found++;
-            if (stageMovie(dir, files, videos, features, duplicates, issues)) {
-                tally.indexed++;
-            }
+            stageMovie(dir, files, videos, features, issues);
+            tally.indexed++;
             return;
         }
 
@@ -151,15 +146,17 @@ class FilesystemMovieScan implements SourceScan {
         }
         if (level < MAX_DEPTH) {
             for (Path child : childDirectories) {
-                scanDirectory(child, level + 1, duplicates, issues, tally);
+                scanDirectory(child, level + 1, issues, tally);
             }
         }
     }
 
-    /** Stages the movie folder, appending any issues it turned up; false when a duplicate skips it. */
-    private boolean stageMovie(Path folder, List<Path> files, List<FeatureSelection.Video> videos,
-                               List<FeatureSelection.Video> features, DuplicateGuard duplicates,
-                               List<RunIssue> issues) {
+    /**
+     * Stages the movie folder, appending any issues it turned up. Duplicates are not de-duplicated:
+     * the same film in two folders is staged from both, so the duplicate-movie scan can later reveal it.
+     */
+    private void stageMovie(Path folder, List<Path> files, List<FeatureSelection.Video> videos,
+                            List<FeatureSelection.Video> features, List<RunIssue> issues) {
         Path nfo = firstNfo(files);
         String raw = nfo == null ? null : read(nfo);
         ParsedMovie parsed = parseOrAbsent(raw);
@@ -170,17 +167,9 @@ class FilesystemMovieScan implements SourceScan {
         String resolution = Resolution.fromFilename(featureFilename).map(Resolution::display).orElse(null);
         StagedMovie movie = StagedMovie.from(parsed, folderName, path, raw, resolution);
 
-        Optional<String> alreadyCatalogued = duplicates.claim(movie, path);
-        if (alreadyCatalogued.isPresent()) {
-            // Same film as a folder already staged this run: skip it, keeping both locations.
-            issues.add(RunIssue.duplicate(path, movie.title(), alreadyCatalogued.get()));
-            return false;
-        }
-
         recordIgnoredVideos(folder, folderName, parsed, videos, featureFilename, issues);
         staging.stage(movie);
         recordThinFields(folder, movie, issues);
-        return true;
     }
 
     /**

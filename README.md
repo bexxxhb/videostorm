@@ -177,7 +177,6 @@ indexing
 │   └── IndexingConfiguration               Single-threaded indexing executor and UTC clock beans
 ├── domain
 │   ├── DerivedTitle                        Folder-based fallback title, stripping media/nfo extensions
-│   ├── DuplicateGuard                      Per-run guard skipping movies duplicating title+year or imdb id
 │   ├── EpisodeDuplicateGuard               Per-show guard skipping episodes duplicating a season+episode
 │   ├── EpisodeNumberParser                 Parses season/episode from a filename via ordered regexes
 │   ├── FeatureSelection                    Picks a folder's feature video by prefix/size/name; lists ignored
@@ -244,7 +243,7 @@ indexing
             ├── EmbyNfo                      Shared secure XML parsing and field extractors for .nfo files
             ├── EmbyShowNfoParser           Parses an Emby tvshow .nfo into a ParsedShow
             ├── FilesystemMountPreflight     Checks source paths are readable, non-empty directories
-            ├── FilesystemMovieScan          Scans movie folders one level deep, staging and recording issues
+            ├── FilesystemMovieScan          Scans movie folders, staging each (duplicates kept, not skipped) and recording issues
             ├── FilesystemShowScan           Scans show folders, staging shows and recursively-found episodes
             ├── NfoParseException            Runtime exception for malformed or wrong-rooted .nfo XML
             ├── RoutingLibraryScan           Dispatches a scan to the SourceScan for the type
@@ -255,16 +254,54 @@ indexing
 
 ```
 maintenance
-└── adapter.in.web
-    ├── CsrfViewAttributes                  Pushes the Spring Security CSRF token into the Pug4j model
-    ├── IndexingRunView                     JavaBean view of a run with display strings for the template
-    ├── LoginController                     Serves /login with CSRF and a login-failed flag (maintenance mode only)
-    └── MaintenanceController               Shows runs, triggers reindex, downloads a report CSV (maintenance only)
+├── domain
+│   ├── DuplicateCriterion                  How two movies match: exact imdb id, or lowercased+trimmed original title
+│   ├── DuplicateGroup                      Movies sharing one value under one criterion (only 2+ members form a group)
+│   ├── DuplicateMember                     One member movie's imdb id, original title and file path, snapshotted
+│   ├── DuplicateScanner                    Groups candidates per shared value, unioning the two criteria
+│   ├── DuplicateScanRun                    One scan's outcome: timestamp, duration and the groups found
+│   ├── DuplicateScanRunSummary             A run's metadata without its groups, for the history table
+│   └── ScanCandidate                       One movie reduced to the attributes duplicate detection needs
+├── application
+│   ├── DuplicateScanService                Runs a scan (read, group, time, persist) and answers the run-result reads
+│   └── port
+│       ├── in
+│       │   ├── DuplicateScanReports        Inbound port: run history, and one run's groups fetched on demand
+│       │   └── TriggerDuplicateScan        Inbound port running a synchronous duplicate-movie scan now
+│       └── out
+│           ├── DuplicateScanCandidates     Outbound port supplying catalogued movies as scan candidates
+│           └── DuplicateScanRunStore       Outbound port persisting scan runs and reading them back
+└── adapter
+    ├── in.web
+    │   ├── CsrfViewAttributes              Pushes the Spring Security CSRF token into the Pug4j model
+    │   ├── DuplicateGroupResponse          JSON group for the drill-down: criterion label, shared value, members
+    │   ├── DuplicateGroupsController        Serves one run's groups as JSON on demand for the drill-down layer
+    │   ├── DuplicateMemberResponse          JSON member: imdb id, original title and file path
+    │   ├── DuplicateScanRunView            JavaBean view of a scan run with display strings for the template
+    │   ├── IndexingRunView                 JavaBean view of a run with display strings for the template
+    │   ├── LoginController                 Serves /login with CSRF and a login-failed flag (maintenance mode only)
+    │   └── MaintenanceController           Shows runs, triggers reindex and duplicate scans, downloads a report CSV
+    └── out.persistence
+        ├── DuplicateScanGroupEntity        JPA entity for the duplicate_scan_group table
+        ├── DuplicateScanMemberEntity       JPA entity for the duplicate_scan_member table
+        ├── DuplicateScanRunEntity          JPA entity for the duplicate_scan_run table
+        ├── DuplicateScanRunJpaRepository   Spring Data repo listing runs newest-first
+        ├── DuplicateScanRunStoreAdapter    Adapts the JPA repo to the port, mapping to/from DuplicateScanRun
+        └── JdbcDuplicateScanCandidates     Projects the movie table to candidates (imdb id, original title, path)
 ```
 
 The whole area is governed by the operating mode (see *Operating mode* under *Running it*): in the
 default `presentation` mode `MaintenanceController` and `LoginController` are not registered and
 their routes are denied, so nothing here is reachable; in `maintenance` mode it behaves as above.
+
+Alongside re-indexing, the maintenance page offers a standalone **duplicate-movie scan**. Movies are
+deliberately **not** de-duplicated during indexing — a film appearing in two source folders is
+catalogued from both — because the source filesystems unavoidably contain doubled entries and the
+point is to reveal them rather than silently drop one. The scan finds them: two movies are duplicates
+when they share an exact imdb id **or** an original title (compared lowercased and trimmed), grouped
+per shared value so a movie can appear under more than one group. Each run is persisted in full and
+kept indefinitely; the page lists past runs (duration, group count) and a drill-down link that fetches
+that run's groups on demand and lists each member's imdb id, original title and file path.
 
 Templates live under `src/main/resources/templates` — `layout.pug` (the shared shell),
 `movies.pug` and `shows.pug` (public listings), and `login.pug` and `maintenance.pug` (the admin
@@ -272,7 +309,13 @@ area, rendered only in `maintenance` mode) — with static assets (`css/`, `js/`
 `src/main/resources/static`. The listings keep their per-row detail out of the initial page: the
 shared `content-dialog` (wired by `js/content-dialog.js`) opens a title's Plot inline and fetches
 its raw `.nfo` and its cast (the "Actors" layer) on demand, the cast rendered from JSON as a block
-per performer with the bundled `img/no-actor.svg` placeholder when a portrait is missing.
+per performer with the bundled `img/no-actor.svg` placeholder when a portrait is missing. The same
+dialog backs the maintenance page's duplicate-scan drill-down, fetching a run's groups as JSON and
+rendering each group's member movies on demand.
 
 Schema changes are Flyway migrations under `src/main/resources/db/migration`. Hibernate never
-generates DDL.
+generates DDL. The duplicate-movie scan persists to `duplicate_scan_run`/`_group`/`_member`
+(`V15`), and `V16` drops the movie identity/imdb unique indexes so doubled entries can be
+catalogued for the scan to reveal (the show tables keep their uniqueness). Because `V8`'s comments
+still describe those now-removed movie indexes, they read as stale — `V16` is the corrective
+migration.
