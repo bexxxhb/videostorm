@@ -1,11 +1,15 @@
 extends layout
 
+include mixins/pagination
+
 block content
   form.search(method="get", action="/movies")
     input.search__input(type="search", name="q", value=query, placeholder="Search title, genre or year")
     input(type="hidden", name="sort", value=sort.field)
     input(type="hidden", name="dir", value=sort.direction)
     button.search__button(type="submit") Search
+
+  +pagination(pagination, pageNumber, totalPages, totalElements)
 
   table.catalogue
     thead
@@ -48,21 +52,4 @@ block content
             if movie.hasRawNfo
               a.rawnfo-link(href=movie.rawNfoUrl, data-title=movie.title) Raw data
 
-  nav.pagination
-    if pagination.firstPageUrl
-      a.pagination__link(href=pagination.firstPageUrl) First
-    else
-      span.pagination__link.pagination__link--disabled First
-    if pagination.previousPageUrl
-      a.pagination__link(href=pagination.previousPageUrl) Previous
-    else
-      span.pagination__link.pagination__link--disabled Previous
-    span.pagination__status Page #{pageNumber} of #{totalPages} (#{totalElements} total)
-    if pagination.nextPageUrl
-      a.pagination__link(href=pagination.nextPageUrl) Next
-    else
-      span.pagination__link.pagination__link--disabled Next
-    if pagination.lastPageUrl
-      a.pagination__link(href=pagination.lastPageUrl) Last
-    else
-      span.pagination__link.pagination__link--disabled Last
+  +pagination(pagination, pageNumber, totalPages, totalElements)
