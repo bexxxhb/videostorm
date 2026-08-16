@@ -4,13 +4,13 @@ import de.videostorm.indexing.domain.IndexingRun;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 /**
  * A run shaped for the maintenance page: display strings only, so the template stays free of
- * formatting and never sees a domain object. Timestamps are rendered in UTC; a run still in flight
- * has no finish time.
+ * formatting and never sees a domain object. Timestamps are rendered in Europe/Berlin local time;
+ * a run still in flight has no finish time.
  *
  * <p>Plain JavaBean rather than a record — Pug4j resolves model properties via {@code getXxx()},
  * which record accessors ({@code xxx()}) don't satisfy.
@@ -20,7 +20,7 @@ import java.time.format.DateTimeFormatter;
 public class IndexingRunView {
 
     private static final DateTimeFormatter TIMESTAMP =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC);
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("Europe/Berlin"));
 
     private final long id;
     private final String type;

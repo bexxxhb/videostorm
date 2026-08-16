@@ -5,13 +5,14 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 import java.time.Duration;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 /**
  * A duplicate scan run shaped for the run-result table: display strings only, so the template stays
- * free of formatting. The execution timestamp is rendered in UTC and the duration in milliseconds;
- * {@code hasGroups} gates the drill-down link, which is offered only when a run found something.
+ * free of formatting. The execution timestamp is rendered in Europe/Berlin local time and the
+ * duration in milliseconds; {@code hasGroups} gates the drill-down link, which is offered only when
+ * a run found something.
  *
  * <p>Plain JavaBean rather than a record — Pug4j resolves model properties via {@code getXxx()},
  * which record accessors don't satisfy.
@@ -21,7 +22,7 @@ import java.time.format.DateTimeFormatter;
 public class DuplicateScanRunView {
 
     private static final DateTimeFormatter TIMESTAMP =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC);
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.of("Europe/Berlin"));
 
     private final long id;
     private final String executedAt;

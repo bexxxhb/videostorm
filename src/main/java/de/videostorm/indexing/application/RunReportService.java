@@ -10,7 +10,7 @@ import de.videostorm.indexing.domain.RunIssue;
 import de.videostorm.indexing.domain.RunReportCsv;
 import org.springframework.stereotype.Service;
 
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 public class RunReportService implements RunReports {
 
     private static final DateTimeFormatter FILENAME_TIMESTAMP =
-            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
+            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneId.of("Europe/Berlin"));
 
     private final IndexingRunRepository runs;
     private final RunIssueRepository runIssues;
