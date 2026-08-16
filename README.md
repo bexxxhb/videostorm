@@ -18,6 +18,11 @@ Overridable via the environment (or a `.env` file): `POSTGRES_DB`, `POSTGRES_USE
 `admin` / `changeme`) — the login for the `/maintenance` area, BCrypted once at startup and never
 logged. Change the admin credentials for anything beyond local use.
 
+For a view-only deployment with no media to mount — e.g. a demo or presentation box — use
+`docker compose -f docker-compose-presentation.yml up --build` instead. It runs the same `db`
+service, but the `app` service has no bind mounts and is published on host port 8090 rather than
+8080.
+
 ### Operating mode
 
 `APPLICATION_OPERATING_MODE` (`application.operating.mode`) selects what is reachable, switchable
@@ -304,7 +309,8 @@ point is to reveal them rather than silently drop one. The scan finds them: two 
 when they share an exact imdb id **or** an original title (compared lowercased and trimmed), grouped
 per shared value so a movie can appear under more than one group. Each run is persisted in full and
 kept indefinitely; the page lists past runs (duration, group count) and a drill-down link that fetches
-that run's groups on demand and lists each member's imdb id, original title and file path.
+that run's groups on demand and lists each member's imdb id, original title, file path and the main
+movie file's size in MB.
 
 Templates live under `src/main/resources/templates` — `layout.pug` (the shared shell),
 `movies.pug` and `shows.pug` (public listings), and `login.pug` and `maintenance.pug` (the admin
@@ -316,9 +322,17 @@ per performer with the bundled `img/no-actor.svg` placeholder when a portrait is
 dialog backs the maintenance page's duplicate-scan drill-down, fetching a run's groups as JSON and
 rendering each group's member movies on demand.
 
+The shared `mixins/pagination.pug` mixin renders the movies/shows pagination controls once above
+the table header and once below it, so long listings don't need a scroll back to the top to change
+page. Each listing table also declares a `colgroup` with a fixed width per column and
+`table-layout: fixed`, so column widths stay stable when a sort click re-renders the page with a
+differently-sized result set; long values are truncated with an ellipsis rather than reflowing the
+columns.
+
 Schema changes are Flyway migrations under `src/main/resources/db/migration`. Hibernate never
 generates DDL. The duplicate-movie scan persists to `duplicate_scan_run`/`_group`/`_member`
 (`V15`), and `V16` drops the movie identity/imdb unique indexes so doubled entries can be
 catalogued for the scan to reveal (the show tables keep their uniqueness). Because `V8`'s comments
 still describe those now-removed movie indexes, they read as stale — `V16` is the corrective
-migration.
+migration. `V17` adds the movie file size column, threaded from the scan through staging into the
+live table so the duplicate-scan drill-down can show it.
