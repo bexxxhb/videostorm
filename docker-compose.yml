@@ -54,49 +54,58 @@ services:
       # Up to 5 movie roots and 3 show roots, numbered 1..N. An unused slot defaults to an empty
       # local folder; VIDEOSTORM_SOURCES_MOVIES/SHOWS above can also be overridden to list fewer
       # container paths if some slots aren't in use.
-      - type: bind
-        source: ${VIDEOSTORM_MOVIES_HOST_1:-./media/movies-1}
-        target: /media/movies-1
-        read_only: true
-        bind: { create_host_path: false, propagation: rslave }
-      - type: bind
-        source: ${VIDEOSTORM_MOVIES_HOST_2:-./media/movies-2}
-        target: /media/movies-2
-        read_only: true
-        bind: { create_host_path: false, propagation: rslave }
-      - type: bind
-        source: ${VIDEOSTORM_MOVIES_HOST_3:-./media/movies-3}
-        target: /media/movies-3
-        read_only: true
-        bind: { create_host_path: false, propagation: rslave }
-      - type: bind
-        source: ${VIDEOSTORM_MOVIES_HOST_4:-./media/movies-4}
-        target: /media/movies-4
-        read_only: true
-        bind: { create_host_path: false, propagation: rslave }
-      - type: bind
-        source: ${VIDEOSTORM_MOVIES_HOST_5:-./media/movies-5}
-        target: /media/movies-5
-        read_only: true
-        bind: { create_host_path: false, propagation: rslave }
-      - type: bind
-        source: ${VIDEOSTORM_SHOWS_HOST_1:-./media/shows-1}
-        target: /media/shows-1
-        read_only: true
-        bind: { create_host_path: false, propagation: rslave }
-      - type: bind
-        source: ${VIDEOSTORM_SHOWS_HOST_2:-./media/shows-2}
-        target: /media/shows-2
-        read_only: true
-        bind: { create_host_path: false, propagation: rslave }
-      - type: bind
-        source: ${VIDEOSTORM_SHOWS_HOST_3:-./media/shows-3}
-        target: /media/shows-3
-        read_only: true
-        bind: { create_host_path: false, propagation: rslave }
+      - qnapf18TB2160p:/media/movies-1
+      - qnapf15TB2160p:/media/movies-2
+      - qnapf15TB1080p:/media/movies-3
+      - ts40012TB1080p:/media/movies-4
+      - ts40012TB720p:/media/movies-5
+      - ts40016TBShows:/media/shows-1
+      - ts40014TBShows:/media/shows-2
+      - ts40010TBShows:/media/shows-3
+
     ports:
       - "8080:8080"
     restart: unless-stopped
 
 volumes:
   pgdata:
+  qnapf18TB2160p:
+    driver_opts:
+      type: cifs
+      o: "user=marcelk,password=P_M2012!,file_mode=0777,dir_mode=0755,iocharset=utf8,vers=3.1.1,rw,uid=1000,gid=1000,sec=ntlmssp"
+      device: "//192.168.10.244/hd_18tb_1/2160p"
+  qnapf15TB2160p:
+    driver_opts:
+      type: cifs
+      o: "user=marcelk,password=P_M2012!,file_mode=0777,dir_mode=0755,iocharset=utf8,vers=3.1.1,rw,uid=1000,gid=1000,sec=ntlmssp"
+      device: "//192.168.10.244/hd_15tb_2/2160p"
+  qnapf15TB1080p:
+    driver_opts:
+      type: cifs
+      o: "user=marcelk,password=P_M2012!,file_mode=0777,dir_mode=0755,iocharset=utf8,vers=3.1.1,rw,uid=1000,gid=1000,sec=ntlmssp"
+      device: "//192.168.10.244/hd_15tb_2/1080p"
+  ts40012TB1080p:
+    driver_opts:
+      type: cifs
+      o: "user=marcelk,password=P_M2012!,file_mode=0777,dir_mode=0755,iocharset=utf8,vers=3.1.1,rw,uid=1000,gid=1000,sec=ntlmssp"
+      device: "//192.168.10.244/ts40012tb1/1080p"
+  ts40012TB720p:
+    driver_opts:
+      type: cifs
+      o: "user=marcelk,password=P_M2012!,file_mode=0777,dir_mode=0755,iocharset=utf8,vers=3.1.1,rw,uid=1000,gid=1000,sec=ntlmssp"
+      device: "//192.168.10.244/ts40012tb1/720p"
+  ts40016TBShows:
+    driver_opts:
+      type: cifs
+      o: "user=marcelk,password=P_M2012!,file_mode=0777,dir_mode=0755,iocharset=utf8,vers=3.1.1,rw,uid=1000,gid=1000,sec=ntlmssp"
+      device: "//192.168.10.244/ts40016tb1/SERIEN"
+  ts40014TBShows:
+    driver_opts:
+      type: cifs
+      o: "user=marcelk,password=P_M2012!,file_mode=0777,dir_mode=0755,iocharset=utf8,vers=3.1.1,rw,uid=1000,gid=1000,sec=ntlmssp"
+      device: "//192.168.10.244/ts40014tb1/SERIEN"
+  ts40010TBShows:
+    driver_opts:
+      type: cifs
+      o: "user=marcelk,password=P_M2012!,file_mode=0777,dir_mode=0755,iocharset=utf8,vers=3.1.1,rw,uid=1000,gid=1000,sec=ntlmssp"
+      device: "//192.168.10.244/ts40010tb1/SERIEN"
