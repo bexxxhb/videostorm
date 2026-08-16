@@ -73,6 +73,7 @@ body {
 
 .catalogue {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
 }
 
@@ -80,6 +81,56 @@ body {
 .catalogue td {
     padding: 0.45rem 0.75rem;
     text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.col--index {
+    width: 3rem;
+}
+
+.col--title {
+    width: 16rem;
+}
+
+.col--year {
+    width: 5rem;
+}
+
+.col--status {
+    width: 6rem;
+}
+
+.col--rating {
+    width: 5rem;
+}
+
+.col--genres {
+    width: 12rem;
+}
+
+.col--runtime,
+.col--resolution,
+.col--episodes {
+    width: 6rem;
+}
+
+.col--seasons {
+    width: 5rem;
+}
+
+.col--plot {
+    width: 4rem;
+}
+
+.col--actors,
+.col--imdb {
+    width: 5rem;
+}
+
+.col--rawnfo {
+    width: 6rem;
 }
 
 .catalogue thead th {
