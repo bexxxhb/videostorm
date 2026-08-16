@@ -46,7 +46,8 @@ class MovieStagingIT extends PostgresIntegrationTestBase {
         ParsedMovie parsed = new ParsedMovie("96 Hours - Taken 3", "Taken 3", 2014,
                 List.of(tmdb, imdb), List.of("Action", "Thriller"), List.of(lead, support), 109, "A plot.",
                 "Taken Collection", "133352", "tt2446042", null, "260346");
-        return StagedMovie.from(parsed, "Taken 3 (2014)", "/media/movies/Taken 3 (2014)", "<movie>raw</movie>", "1080p");
+        return StagedMovie.from(parsed, "Taken 3 (2014)", "/media/movies/Taken 3 (2014)", 1_500_000_000L,
+                "<movie>raw</movie>", "1080p");
     }
 
     @Test
@@ -70,6 +71,7 @@ class MovieStagingIT extends PostgresIntegrationTestBase {
         assertThat(row.get("raw_nfo")).isEqualTo("<movie>raw</movie>");
         assertThat(row.get("slug")).isEqualTo("96-hours-taken-3-2014");
         assertThat(row.get("source_path")).isEqualTo("/media/movies/Taken 3 (2014)");
+        assertThat(row.get("size_bytes")).isEqualTo(1_500_000_000L);
         assertThat(row.get("derived_title")).isEqualTo(false);
         // Inline columns carry the default provider's rating for the listing.
         assertThat(row.get("rating_source")).isEqualTo("themoviedb");

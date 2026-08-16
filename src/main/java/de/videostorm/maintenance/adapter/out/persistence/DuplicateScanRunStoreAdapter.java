@@ -72,6 +72,7 @@ class DuplicateScanRunStoreAdapter implements DuplicateScanRunStore {
         entity.setImdbId(member.imdbId().orElse(null));
         entity.setOriginalTitle(member.originalTitle().orElse(null));
         entity.setFilePath(member.filePath().orElse(null));
+        entity.setSizeBytes(member.sizeBytes().orElse(null));
         return entity;
     }
 
@@ -100,6 +101,7 @@ class DuplicateScanRunStoreAdapter implements DuplicateScanRunStore {
         return new DuplicateMember(
                 Optional.ofNullable(entity.getImdbId()),
                 Optional.ofNullable(entity.getOriginalTitle()),
-                Optional.ofNullable(entity.getFilePath()));
+                Optional.ofNullable(entity.getFilePath()),
+                Optional.ofNullable(entity.getSizeBytes()));
     }
 }

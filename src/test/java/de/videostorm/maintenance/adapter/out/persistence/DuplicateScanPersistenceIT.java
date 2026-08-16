@@ -51,8 +51,9 @@ class DuplicateScanPersistenceIT extends PostgresIntegrationTestBase {
     @Test
     void roundTripsARunWithItsGroupsAndMembers() {
         DuplicateGroup group = new DuplicateGroup(DuplicateCriterion.IMDB_ID, "tt1", List.of(
-                new DuplicateMember(Optional.of("tt1"), Optional.of("The Matrix"), Optional.of("/a")),
-                new DuplicateMember(Optional.of("tt1"), Optional.empty(), Optional.of("/b"))));
+                new DuplicateMember(Optional.of("tt1"), Optional.of("The Matrix"), Optional.of("/a"),
+                        Optional.of(1_500_000_000L)),
+                new DuplicateMember(Optional.of("tt1"), Optional.empty(), Optional.of("/b"), Optional.empty())));
         DuplicateScanRun saved = store.save(
                 new DuplicateScanRun(null, EXECUTED, Duration.ofMillis(42), List.of(group)));
 
@@ -66,7 +67,9 @@ class DuplicateScanPersistenceIT extends PostgresIntegrationTestBase {
             assertThat(reloadedGroup.criterion()).isEqualTo(DuplicateCriterion.IMDB_ID);
             assertThat(reloadedGroup.sharedValue()).isEqualTo("tt1");
             assertThat(reloadedGroup.members()).hasSize(2);
+            assertThat(reloadedGroup.members().get(0).sizeBytes()).contains(1_500_000_000L);
             assertThat(reloadedGroup.members().get(1).originalTitle()).isEmpty();
+            assertThat(reloadedGroup.members().get(1).sizeBytes()).isEmpty();
         });
     }
 
@@ -75,8 +78,10 @@ class DuplicateScanPersistenceIT extends PostgresIntegrationTestBase {
         store.save(new DuplicateScanRun(null, EXECUTED, Duration.ofMillis(10), List.of()));
         store.save(new DuplicateScanRun(null, EXECUTED.plusSeconds(60), Duration.ofMillis(20), List.of(
                 new DuplicateGroup(DuplicateCriterion.ORIGINAL_TITLE, "the matrix", List.of(
-                        new DuplicateMember(Optional.empty(), Optional.of("The Matrix"), Optional.of("/a")),
-                        new DuplicateMember(Optional.empty(), Optional.of("Matrix"), Optional.of("/b")))))));
+                        new DuplicateMember(Optional.empty(), Optional.of("The Matrix"), Optional.of("/a"),
+                                Optional.empty()),
+                        new DuplicateMember(Optional.empty(), Optional.of("Matrix"), Optional.of("/b"),
+                                Optional.empty()))))));
 
         assertThat(store.history())
                 .extracting(summary -> summary.executedAt(), summary -> summary.groupCount())
@@ -92,8 +97,8 @@ class DuplicateScanPersistenceIT extends PostgresIntegrationTestBase {
 
     @Test
     void projectsMoviesToCandidatesTreatingBlanksAsAbsent() {
-        insertMovie("tt0111161", "The Matrix", "/films/matrix.mkv");
-        insertMovie(null, "   ", "/films/untitled.mkv");
+        insertMovie("tt0111161", "The Matrix", "/films/matrix.mkv", 1_500_000_000L);
+        insertMovie(null, "   ", "/films/untitled.mkv", null);
 
         List<ScanCandidate> all = candidates.all();
 
@@ -102,22 +107,25 @@ class DuplicateScanPersistenceIT extends PostgresIntegrationTestBase {
             assertThat(candidate.imdbId()).contains("tt0111161");
             assertThat(candidate.originalTitle()).contains("The Matrix");
             assertThat(candidate.filePath()).contains("/films/matrix.mkv");
+            assertThat(candidate.sizeBytes()).contains(1_500_000_000L);
         });
         assertThat(all).anySatisfy(candidate -> {
             assertThat(candidate.imdbId()).isEmpty();
             assertThat(candidate.originalTitle()).isEmpty();
             assertThat(candidate.filePath()).contains("/films/untitled.mkv");
+            assertThat(candidate.sizeBytes()).isEmpty();
         });
     }
 
-    private void insertMovie(String imdbId, String originalTitle, String sourcePath) {
+    private void insertMovie(String imdbId, String originalTitle, String sourcePath, Long sizeBytes) {
         // A unique slug/normalized_title only satisfies the columns; the projection under test is what
         // matters, and movie de-duplication no longer constrains what rows may coexist.
         String unique = String.valueOf(System.nanoTime());
         jdbcTemplate.update("""
-                INSERT INTO movie (title, original_title, year, normalized_title, genres, imdb_id, source_path, slug)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO movie (title, original_title, year, normalized_title, genres, imdb_id, source_path,
+                    slug, size_bytes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                "Title", originalTitle, 0, "title-" + unique, "", imdbId, sourcePath, "slug-" + unique);
+                "Title", originalTitle, 0, "title-" + unique, "", imdbId, sourcePath, "slug-" + unique, sizeBytes);
     }
 }

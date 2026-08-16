@@ -23,13 +23,13 @@ class JdbcMovieStaging implements MovieStaging {
                 title, original_title, year, normalized_title, normalized_original_title,
                 rating_source, rating_value, rating_max, rating_votes,
                 genres, runtime_minutes, resolution, plot, set_name, collection_id,
-                imdb_id, tvdb_id, tmdb_id, raw_nfo, slug, source_path,
+                imdb_id, tvdb_id, tmdb_id, raw_nfo, slug, source_path, size_bytes,
                 derived_title, derived_year)
             VALUES (
                 :title, :originalTitle, :year, :normalizedTitle, :normalizedOriginalTitle,
                 :ratingSource, :ratingValue, :ratingMax, :ratingVotes,
                 :genres, :runtimeMinutes, :resolution, :plot, :setName, :collectionId,
-                :imdbId, :tvdbId, :tmdbId, :rawNfo, :slug, :sourcePath,
+                :imdbId, :tvdbId, :tmdbId, :rawNfo, :slug, :sourcePath, :sizeBytes,
                 :derivedTitle, FALSE)
             RETURNING id
             """;
@@ -85,7 +85,8 @@ class JdbcMovieStaging implements MovieStaging {
                 .addValue("tmdbId", movie.tmdbId())
                 .addValue("rawNfo", movie.rawNfo())
                 .addValue("slug", movie.slug())
-                .addValue("sourcePath", movie.sourcePath());
+                .addValue("sourcePath", movie.sourcePath())
+                .addValue("sizeBytes", movie.sizeBytes());
 
         Long movieId = jdbc.queryForObject(INSERT_MOVIE, params, Long.class);
 

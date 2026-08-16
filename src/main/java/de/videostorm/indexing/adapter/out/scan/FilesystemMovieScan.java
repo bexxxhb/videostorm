@@ -162,26 +162,26 @@ class FilesystemMovieScan implements SourceScan {
         ParsedMovie parsed = parseOrAbsent(raw);
         String folderName = folder.getFileName().toString();
 
-        String featureFilename = chooseFeatureFilename(folderName, features);
+        FeatureSelection.Video feature = chooseFeature(folderName, features);
         String path = pathOf(folder);
-        String resolution = Resolution.fromFilename(featureFilename).map(Resolution::display).orElse(null);
-        StagedMovie movie = StagedMovie.from(parsed, folderName, path, raw, resolution);
+        String resolution = Resolution.fromFilename(feature.filename()).map(Resolution::display).orElse(null);
+        StagedMovie movie = StagedMovie.from(parsed, folderName, path, feature.sizeBytes(), raw, resolution);
 
-        recordIgnoredVideos(folder, folderName, parsed, videos, featureFilename, issues);
+        recordIgnoredVideos(folder, folderName, parsed, videos, feature.filename(), issues);
         staging.stage(movie);
         recordThinFields(folder, movie, issues);
     }
 
     /**
-     * The filename of the feature: the single feature-sized video where there is one, otherwise the one
+     * The feature video: the single feature-sized video where there is one, otherwise the one
      * {@link FeatureSelection} picks from among the feature-sized videos — so a trailer or sample below
      * the threshold is never even a candidate for the feature.
      */
-    private static String chooseFeatureFilename(String folderName, List<FeatureSelection.Video> features) {
+    private static FeatureSelection.Video chooseFeature(String folderName, List<FeatureSelection.Video> features) {
         if (features.size() == 1) {
-            return features.get(0).filename();
+            return features.get(0);
         }
-        return FeatureSelection.choose(folderName, features).feature().filename();
+        return FeatureSelection.choose(folderName, features).feature();
     }
 
     /** Records every video that is not the chosen feature — smaller clips included — as ignored. */

@@ -75,8 +75,9 @@
     }
 
     // Builds one block per duplicate group: a heading naming the criterion and the value the movies
-    // share, then a row per member listing its IMDb id, original title and file path. A missing
-    // attribute shows as a dash. Every value goes in via textContent, so nothing in a payload is markup.
+    // share, then a row per member listing its IMDb id, original title, file path and file size in MB.
+    // A missing attribute shows as a dash. Every value goes in via textContent, so nothing in a payload
+    // is markup.
     function renderDuplicateGroups(groups) {
         bodyEl.textContent = "";
         if (!groups.length) {
@@ -95,17 +96,27 @@
             group.members.forEach(function (member) {
                 var row = document.createElement("div");
                 row.className = "dup-member";
-                [member.imdbId, member.originalTitle, member.filePath].forEach(function (value) {
-                    var cell = document.createElement("div");
-                    cell.className = "dup-member__cell";
-                    cell.textContent = value || "—";
-                    row.appendChild(cell);
-                });
+                [member.imdbId, member.originalTitle, member.filePath, formatSizeMb(member.sizeBytes)]
+                    .forEach(function (value) {
+                        var cell = document.createElement("div");
+                        cell.className = "dup-member__cell";
+                        cell.textContent = value || "—";
+                        row.appendChild(cell);
+                    });
                 block.appendChild(row);
             });
 
             bodyEl.appendChild(block);
         });
+    }
+
+    // Renders a byte count as whole megabytes, e.g. "1420 MB"; null/undefined (no stored size, or a
+    // movie catalogued before this column existed) renders as a dash via the caller's fallback.
+    function formatSizeMb(sizeBytes) {
+        if (sizeBytes === null || sizeBytes === undefined) {
+            return null;
+        }
+        return Math.round(sizeBytes / (1024 * 1024)) + " MB";
     }
 
     document.querySelectorAll(".plot-link").forEach(function (link) {

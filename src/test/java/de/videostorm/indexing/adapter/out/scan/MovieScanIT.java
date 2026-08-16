@@ -92,6 +92,7 @@ class MovieScanIT extends PostgresIntegrationTestBase {
         assertThat(taken.get("year")).isEqualTo(2014);
         assertThat(taken.get("rating_source")).isEqualTo("themoviedb");
         assertThat(taken.get("source_path")).isEqualTo(MOVIES_DIR.resolve("Taken 3 (2014)").toString());
+        assertThat(taken.get("size_bytes")).isEqualTo(FeatureVideo.MIN_BYTES);
         Long takenId = ((Number) taken.get("id")).longValue();
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM movie_rating_staging WHERE movie_id = ?", Long.class, takenId))

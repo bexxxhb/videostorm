@@ -9,9 +9,9 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 /**
- * Reads the live catalogue's movies down to the three attributes the scan needs. A plain projection
- * over the {@code movie} table — the same table the indexing write path owns — kept read-only here so
- * a scan never carries a whole movie aggregate just to compare an id and a title.
+ * Reads the live catalogue's movies down to the attributes the scan needs. A plain projection over the
+ * {@code movie} table — the same table the indexing write path owns — kept read-only here so a scan
+ * never carries a whole movie aggregate just to compare an id and a title.
  */
 @Repository
 @RequiredArgsConstructor
@@ -22,8 +22,13 @@ class JdbcDuplicateScanCandidates implements DuplicateScanCandidates {
     @Override
     public List<ScanCandidate> all() {
         return jdbcTemplate.query(
-                "SELECT imdb_id, original_title, source_path FROM movie",
-                (rs, rowNum) -> ScanCandidate.of(
-                        rs.getString("imdb_id"), rs.getString("original_title"), rs.getString("source_path")));
+                "SELECT imdb_id, original_title, source_path, size_bytes FROM movie",
+                (rs, rowNum) -> {
+                    long sizeBytes = rs.getLong("size_bytes");
+                    Long sizeBytesOrNull = rs.wasNull() ? null : sizeBytes;
+                    return ScanCandidate.of(
+                            rs.getString("imdb_id"), rs.getString("original_title"), rs.getString("source_path"),
+                            sizeBytesOrNull);
+                });
     }
 }

@@ -36,4 +36,7 @@ class DuplicateScanMemberEntity {
 
     @Column(name = "file_path")
     private String filePath;
+
+    @Column(name = "size_bytes")
+    private Long sizeBytes;
 }
