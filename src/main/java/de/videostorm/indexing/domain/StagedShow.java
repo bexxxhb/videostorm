@@ -34,10 +34,12 @@ public record StagedShow(
         String tvdbId,
         String tmdbId,
         ParsedRating defaultRating,
-        List<ParsedRating> ratings) {
+        List<ParsedRating> ratings,
+        List<ParsedActor> actors) {
 
     public StagedShow {
         ratings = ratings == null ? List.of() : List.copyOf(ratings);
+        actors = actors == null ? List.of() : List.copyOf(actors);
     }
 
     /**
@@ -69,7 +71,8 @@ public record StagedShow(
                 parsed.tvdbId(),
                 parsed.tmdbId(),
                 defaultRating(parsed.ratings()),
-                parsed.ratings());
+                parsed.ratings(),
+                parsed.actors());
     }
 
     private static ParsedRating defaultRating(List<ParsedRating> ratings) {

@@ -27,6 +27,7 @@ public record StagedMovie(
         String normalizedOriginalTitle,
         String slug,
         String sourcePath,
+        long sizeBytes,
         String rawNfo,
         String genresStorage,
         Integer runtimeMinutes,
@@ -38,10 +39,12 @@ public record StagedMovie(
         String tvdbId,
         String tmdbId,
         ParsedRating defaultRating,
-        List<ParsedRating> ratings) {
+        List<ParsedRating> ratings,
+        List<ParsedActor> actors) {
 
     public StagedMovie {
         ratings = ratings == null ? List.of() : List.copyOf(ratings);
+        actors = actors == null ? List.of() : List.copyOf(actors);
     }
 
     /**
@@ -60,8 +63,8 @@ public record StagedMovie(
      * is flagged {@link #derivedTitle()}. The normalised keys and identity slug are always computed
      * from the effective title, so a derived title still sorts, searches and identifies correctly.
      */
-    public static StagedMovie from(ParsedMovie parsed, String folderName, String sourcePath, String rawNfo,
-                                   String resolution) {
+    public static StagedMovie from(ParsedMovie parsed, String folderName, String sourcePath, long sizeBytes,
+                                   String rawNfo, String resolution) {
         boolean derivedTitle = parsed.title() == null;
         String title = DerivedTitle.resolve(parsed.title(), folderName);
         int year = parsed.year() == null ? 0 : parsed.year();
@@ -75,6 +78,7 @@ public record StagedMovie(
                 originalTitle == null ? null : TitleNormalizer.normalize(originalTitle),
                 Slug.of(title, year),
                 sourcePath,
+                sizeBytes,
                 rawNfo,
                 new GenreList(parsed.genres()).toStorage(),
                 parsed.runtimeMinutes(),
@@ -86,7 +90,8 @@ public record StagedMovie(
                 parsed.tvdbId(),
                 parsed.tmdbId(),
                 defaultRating(parsed.ratings()),
-                parsed.ratings());
+                parsed.ratings(),
+                parsed.actors());
     }
 
     private static ParsedRating defaultRating(List<ParsedRating> ratings) {

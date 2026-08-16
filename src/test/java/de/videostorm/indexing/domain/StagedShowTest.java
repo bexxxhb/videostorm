@@ -18,7 +18,7 @@ class StagedShowTest {
 
     private static ParsedShow parsed(String premiered, String status,
                                      List<ParsedRating> ratings, List<String> genres) {
-        return new ParsedShow("Breaking Bad", "Breaking Bad", premiered, ratings, genres,
+        return new ParsedShow("Breaking Bad", "Breaking Bad", premiered, ratings, genres, List.of(),
                 "A plot.", status, "tt0903747", "81189", "1396");
     }
 
@@ -58,7 +58,7 @@ class StagedShowTest {
 
     @Test
     void fallsBackToTheFolderNameAndFlagsADerivedTitleWhenMetadataHasNone() {
-        ParsedShow noTitle = new ParsedShow(null, null, null, List.of(), List.of(),
+        ParsedShow noTitle = new ParsedShow(null, null, null, List.of(), List.of(), List.of(),
                 null, null, null, null, null);
 
         StagedShow staged = StagedShow.from(noTitle, "The Wire (2002)", "/p", "x");
@@ -89,5 +89,18 @@ class StagedShowTest {
         assertThat(staged.defaultRating()).isNull();
         assertThat(staged.ratings()).isEmpty();
         assertThat(staged.status()).isEqualTo(ShowStatus.CONTINUING);
+    }
+
+    @Test
+    void carriesTheParsedCastThroughInBillingOrder() {
+        ParsedActor lead = new ParsedActor("Bryan Cranston", "Walter White", 0, "http://img/cranston.jpg", "17419");
+        ParsedActor support = new ParsedActor("Aaron Paul", "Jesse Pinkman", 1, null, null);
+        ParsedShow parsed = new ParsedShow("Breaking Bad", "Breaking Bad", "2008-01-20",
+                List.of(), List.of(), List.of(lead, support),
+                "A plot.", "Ended", "tt0903747", "81189", "1396");
+
+        StagedShow staged = StagedShow.from(parsed, "Breaking Bad", "/p", "x");
+
+        assertThat(staged.actors()).containsExactly(lead, support);
     }
 }

@@ -18,6 +18,11 @@ Overridable via the environment (or a `.env` file): `POSTGRES_DB`, `POSTGRES_USE
 `admin` / `changeme`) — the login for the `/maintenance` area, BCrypted once at startup and never
 logged. Change the admin credentials for anything beyond local use.
 
+For a view-only deployment with no media to mount — e.g. a demo or presentation box — use
+`docker compose -f docker-compose-presentation.yml up --build` instead. It runs the same `db`
+service, but the `app` service has no bind mounts and is published on host port 8090 rather than
+8080.
+
 ### Operating mode
 
 `APPLICATION_OPERATING_MODE` (`application.operating.mode`) selects what is reachable, switchable
@@ -34,14 +39,25 @@ purely via `.env` with no rebuild:
 The library lives behind read-only bind mounts. Point the host paths at your library and, if the
 container process needs a specific identity to read them, set the uid and gid:
 
-- `VIDEOSTORM_MOVIES_HOST` / `VIDEOSTORM_SHOWS_HOST` — host directories to mount (default
-  `./media/movies`, `./media/shows`), mounted read-only at `/media/movies` and `/media/shows`.
+- `VIDEOSTORM_MOVIES_HOST_1` .. `_5` / `VIDEOSTORM_SHOWS_HOST_1` .. `_3` — host directories to mount,
+  one per source root (default `./media/movies-1` .. `-5`, `./media/shows-1` .. `-3`), mounted
+  read-only at `/media/movies-1` .. `-5` and `/media/shows-1` .. `-3` respectively. Compose wires up
+  to 5 movie roots and 3 show roots by default; a slot you don't need can be left at its empty
+  default folder. For a network library (NAS/SMB/NFS), point these at the **mount points** — the host
+  directories the shares mount onto — not at paths inside the shares. A mount point stays
+  present-but-empty while its share is offline, so the container still starts; the compose mounts use
+  `create_host_path: false` (no masking stub is fabricated) and `propagation: rslave` (a share that
+  (re)mounts on the host after the container started surfaces inside it). When a share is absent the
+  container sees an empty directory and a re-index aborts without touching the catalogue, rather
+  than the daemon refusing to start the container.
 - `VIDEOSTORM_SOURCES_MOVIES` / `VIDEOSTORM_SOURCES_SHOWS` — comma-separated absolute paths the
-  application indexes, **inside** the container; they must match the mounts (default
-  `/media/movies`, `/media/shows`). Entries are trimmed and normalised; startup fails, naming the
-  offending pair, if any two overlap or a path is not absolute. A type with no configured paths
-  does not block startup — its re-index trigger is simply shown disabled. Configured paths are
-  logged with their reachability at startup and never rendered in the UI.
+  application indexes, **inside** the container; they must match the mounts (default the 5
+  `/media/movies-N` paths and the 3 `/media/shows-N` paths above). The list accepts any number of
+  entries — 5 and 3 are simply what compose wires by default, not an enforced limit. Entries are
+  trimmed and normalised; startup fails, naming the offending pair, if any two overlap or a path is
+  not absolute. A type with no configured paths does not block startup — its re-index trigger is
+  simply shown disabled. Configured paths are logged with their reachability at startup and never
+  rendered in the UI.
 - `PUID` / `PGID` — uid and gid the container runs as (default `1000`), so it can read files owned
   by your host account.
 
@@ -89,8 +105,7 @@ de.videostorm
 sources
 ├── config
 │   ├── SourcePathReachabilityLogger        Logs existence/readability of each configured path once at startup
-│   ├── SourcesConfiguration                Builds the validated SourcePaths bean from raw properties
-│   └── SourcesProperties                   Binds comma-separated movie/show path config, nulls → empty
+│   └── SourcesConfiguration                Builds the validated SourcePaths bean from the comma-separated movie/show path properties
 └── domain
     ├── SourcePath                          Normalized absolute source location with ancestor-prefix checks
     ├── SourcePaths                         Validated per-type paths rejecting duplicates and nested overlaps
@@ -102,6 +117,7 @@ sources
 ```
 catalogue
 ├── domain
+│   ├── CastMember                          Domain record of one cast member (name, optional role and thumbnail)
 │   ├── GenreList                           Parses/renders Emby's delimiter-padded genre string with a display limit
 │   ├── Movie                               Domain record of the movie subset shown in listings
 │   ├── Rating                              Provider rating value with display label
@@ -111,7 +127,9 @@ catalogue
 │   ├── TitleNormalizer                     Lowercase, strip diacritics, collapse non-alphanumerics
 │   └── Year                                Release-year value object with explicit unknown (0) state
 ├── application
+│   ├── FetchMovieCastService               Reads one movie's cast behind the inbound port
 │   ├── FetchMovieRawNfoService             Reads one movie's raw .nfo behind the inbound port
+│   ├── FetchShowCastService                Reads one show's cast behind the inbound port
 │   ├── FetchShowRawNfoService              Reads one show's raw .nfo behind the inbound port
 │   ├── ListMoviesService                   Paginates and searches movies with page-clamping
 │   ├── ListShowsService                    Paginates and searches shows with page-clamping
@@ -126,31 +144,37 @@ catalogue
 │       ├── in
 │       │   ├── ListMoviesQuery             Inbound port for listing movies
 │       │   ├── ListShowsQuery              Inbound port for listing shows
+│       │   ├── MovieCastQuery              Inbound port for reading one movie's cast on demand
 │       │   ├── MovieRawNfoQuery            Inbound port for reading one movie's raw .nfo on demand
+│       │   ├── ShowCastQuery               Inbound port for reading one show's cast on demand
 │       │   └── ShowRawNfoQuery             Inbound port for reading one show's raw .nfo on demand
 │       └── out
-│           ├── MovieRepository             Outbound port for reading/counting movies
-│           └── ShowRepository              Outbound port for reading/counting shows
+│           ├── MovieRepository             Outbound port for reading/counting movies and reading one movie's cast
+│           └── ShowRepository              Outbound port for reading/counting shows and reading one show's cast
 └── adapter
     ├── in.web
+    │   ├── ActorResponse                   JSON view of one actor (name, role, https-normalized thumbnail) for the layer
+    │   ├── MovieCastController             Serves one movie's cast on demand as JSON; 404 when the movie is unknown
     │   ├── MovieListingController          Public GET controller rendering the movie listing page
     │   ├── MovieRawNfoController           Serves one movie's raw .nfo on demand as plain text; 404 when absent
     │   ├── MovieRow                        Display-ready JavaBean adapting a Movie for the template
     │   ├── MovieSortView                   Per-column SortHeaders plus the active sort as params for the movies form
     │   ├── PaginationLinks                 Computes first/prev/next/last URLs preserving the query
+    │   ├── ShowCastController              Serves one show's cast on demand as JSON; 404 when the show is unknown
     │   ├── ShowListingController           Public GET controller rendering the show listing page
     │   ├── ShowRawNfoController            Serves one show's raw .nfo on demand as plain text; 404 when absent
     │   ├── ShowRow                         Display-ready JavaBean adapting a Show for the template
     │   ├── ShowSortView                    Per-column SortHeaders plus the active sort as params for the shows form
     │   └── SortHeader                      One sortable column's toggle link and ▲/▼/↕ direction marker
     └── out.persistence
+        ├── CastRow                         Projection over movie_actor/show_actor mapping a cast row to a CastMember
         ├── ListingSort                     Builds the paging Sort: chosen column, nulls last, id tiebreak
         ├── MovieEntity                     JPA entity for the movie table (read path)
         ├── MovieJpaRepository              Spring Data repository with the shared movie search predicate
-        ├── MovieRepositoryAdapter          Adapts the JPA repo to the port, escaping LIKE terms
+        ├── MovieRepositoryAdapter          Adapts the JPA repo to the port, escaping LIKE terms; reads cast in billing order
         ├── ShowEntity                      JPA entity for the show table (read path)
         ├── ShowJpaRepository               Spring Data repository with the shared show search predicate
-        └── ShowRepositoryAdapter           Adapts the JPA repo to the port, escaping LIKE terms
+        └── ShowRepositoryAdapter           Adapts the JPA repo to the port, escaping LIKE terms; reads cast in billing order
 ```
 
 ### `indexing` — the scan/ingest side
@@ -161,12 +185,12 @@ indexing
 │   └── IndexingConfiguration               Single-threaded indexing executor and UTC clock beans
 ├── domain
 │   ├── DerivedTitle                        Folder-based fallback title, stripping media/nfo extensions
-│   ├── DuplicateGuard                      Per-run guard skipping movies duplicating title+year or imdb id
 │   ├── EpisodeDuplicateGuard               Per-show guard skipping episodes duplicating a season+episode
 │   ├── EpisodeNumberParser                 Parses season/episode from a filename via ordered regexes
 │   ├── FeatureSelection                    Picks a folder's feature video by prefix/size/name; lists ignored
 │   ├── FeatureVideo                        Min-size rule (500 MB) separating a feature film from clips/samples
 │   ├── IndexingRun                         Immutable run aggregate with lifecycle transitions
+│   ├── ParsedActor                         One parsed <actor>: name, optional role, billing order and thumbnail
 │   ├── ParsedEpisodeNumber                 Parsed season number and episode number
 │   ├── ParsedMovie                         Raw Emby movie fields from one .nfo (nullable, with absent())
 │   ├── ParsedRating                        One parsed .nfo rating: source, value, max, votes, default
@@ -184,8 +208,8 @@ indexing
 │   ├── SeasonNumber                        Non-negative season value; 0 is Specials
 │   ├── Slug                                Identity slug from normalized title plus year
 │   ├── StagedEpisode                       Episode season/episode numbers ready for staging
-│   ├── StagedMovie                         Movie parsed fields plus catalogue derivations, ready to stage
-│   ├── StagedShow                          Show parsed fields plus catalogue derivations, ready to stage
+│   ├── StagedMovie                         Movie parsed fields plus catalogue derivations and cast, ready to stage
+│   ├── StagedShow                          Show parsed fields plus catalogue derivations and cast, ready to stage
 │   └── TechnicalTokens                     Strips extension and release/codec/resolution tokens from a name
 ├── application
 │   ├── IndexingService                     Owns the run lifecycle: preflight, background scan, promote, settle
@@ -216,18 +240,18 @@ indexing
         │   ├── IndexingRunEntity           JPA entity for the indexing_run table
         │   ├── IndexingRunJpaRepository    Spring Data repo querying runs by status and start order
         │   ├── IndexingRunRepositoryAdapter Adapts the JPA repo to the port, mapping to/from IndexingRun
-        │   ├── JdbcMoviePromotion          Transactionally swaps staged movies into live movie tables
-        │   ├── JdbcMovieStaging            Writes movies and ratings into staging, each in its own txn
+        │   ├── JdbcMoviePromotion          Transactionally swaps staged movies and cast into live movie tables
+        │   ├── JdbcMovieStaging            Writes movies, ratings and cast into staging, each in its own txn
         │   ├── JdbcRunIssueRepository      Batch-writes, reads and prunes per-run issue detail
-        │   ├── JdbcShowPromotion           Transactionally swaps staged shows/episodes into live tables
-        │   ├── JdbcShowStaging             Writes shows, ratings and episodes into staging
+        │   ├── JdbcShowPromotion           Transactionally swaps staged shows, episodes and cast into live tables
+        │   ├── JdbcShowStaging             Writes shows, ratings, episodes and cast into staging
         │   └── RoutingCataloguePromotion   Dispatches promotion to the CataloguePromotor for the type
         └── scan
             ├── EmbyMovieNfoParser          Parses an Emby movie .nfo into a ParsedMovie
             ├── EmbyNfo                      Shared secure XML parsing and field extractors for .nfo files
             ├── EmbyShowNfoParser           Parses an Emby tvshow .nfo into a ParsedShow
             ├── FilesystemMountPreflight     Checks source paths are readable, non-empty directories
-            ├── FilesystemMovieScan          Scans movie folders one level deep, staging and recording issues
+            ├── FilesystemMovieScan          Scans movie folders, staging each (duplicates kept, not skipped) and recording issues
             ├── FilesystemShowScan           Scans show folders, staging shows and recursively-found episodes
             ├── NfoParseException            Runtime exception for malformed or wrong-rooted .nfo XML
             ├── RoutingLibraryScan           Dispatches a scan to the SourceScan for the type
@@ -238,21 +262,77 @@ indexing
 
 ```
 maintenance
-└── adapter.in.web
-    ├── CsrfViewAttributes                  Pushes the Spring Security CSRF token into the Pug4j model
-    ├── IndexingRunView                     JavaBean view of a run with display strings for the template
-    ├── LoginController                     Serves /login with CSRF and a login-failed flag (maintenance mode only)
-    └── MaintenanceController               Shows runs, triggers reindex, downloads a report CSV (maintenance only)
+├── domain
+│   ├── DuplicateCriterion                  How two movies match: exact imdb id, or lowercased+trimmed original title
+│   ├── DuplicateGroup                      Movies sharing one value under one criterion (only 2+ members form a group)
+│   ├── DuplicateMember                     One member movie's imdb id, original title and file path, snapshotted
+│   ├── DuplicateScanner                    Groups candidates per shared value, unioning the two criteria
+│   ├── DuplicateScanRun                    One scan's outcome: timestamp, duration and the groups found
+│   ├── DuplicateScanRunSummary             A run's metadata without its groups, for the history table
+│   └── ScanCandidate                       One movie reduced to the attributes duplicate detection needs
+├── application
+│   ├── DuplicateScanService                Runs a scan (read, group, time, persist) and answers the run-result reads
+│   └── port
+│       ├── in
+│       │   ├── DuplicateScanReports        Inbound port: run history, and one run's groups fetched on demand
+│       │   └── TriggerDuplicateScan        Inbound port running a synchronous duplicate-movie scan now
+│       └── out
+│           ├── DuplicateScanCandidates     Outbound port supplying catalogued movies as scan candidates
+│           └── DuplicateScanRunStore       Outbound port persisting scan runs and reading them back
+└── adapter
+    ├── in.web
+    │   ├── CsrfViewAttributes              Pushes the Spring Security CSRF token into the Pug4j model
+    │   ├── DuplicateGroupResponse          JSON group for the drill-down: criterion label, shared value, members
+    │   ├── DuplicateGroupsController        Serves one run's groups as JSON on demand for the drill-down layer
+    │   ├── DuplicateMemberResponse          JSON member: imdb id, original title and file path
+    │   ├── DuplicateScanRunView            JavaBean view of a scan run with display strings for the template
+    │   ├── IndexingRunView                 JavaBean view of a run with display strings for the template
+    │   ├── LoginController                 Serves /login with CSRF and a login-failed flag (maintenance mode only)
+    │   └── MaintenanceController           Shows runs, triggers reindex and duplicate scans, downloads a report CSV
+    └── out.persistence
+        ├── DuplicateScanGroupEntity        JPA entity for the duplicate_scan_group table
+        ├── DuplicateScanMemberEntity       JPA entity for the duplicate_scan_member table
+        ├── DuplicateScanRunEntity          JPA entity for the duplicate_scan_run table
+        ├── DuplicateScanRunJpaRepository   Spring Data repo listing runs newest-first
+        ├── DuplicateScanRunStoreAdapter    Adapts the JPA repo to the port, mapping to/from DuplicateScanRun
+        └── JdbcDuplicateScanCandidates     Projects the movie table to candidates (imdb id, original title, path)
 ```
 
 The whole area is governed by the operating mode (see *Operating mode* under *Running it*): in the
 default `presentation` mode `MaintenanceController` and `LoginController` are not registered and
 their routes are denied, so nothing here is reachable; in `maintenance` mode it behaves as above.
 
+Alongside re-indexing, the maintenance page offers a standalone **duplicate-movie scan**. Movies are
+deliberately **not** de-duplicated during indexing — a film appearing in two source folders is
+catalogued from both — because the source filesystems unavoidably contain doubled entries and the
+point is to reveal them rather than silently drop one. The scan finds them: two movies are duplicates
+when they share an exact imdb id **or** an original title (compared lowercased and trimmed), grouped
+per shared value so a movie can appear under more than one group. Each run is persisted in full and
+kept indefinitely; the page lists past runs (duration, group count) and a drill-down link that fetches
+that run's groups on demand and lists each member's imdb id, original title, file path and the main
+movie file's size in MB.
+
 Templates live under `src/main/resources/templates` — `layout.pug` (the shared shell),
 `movies.pug` and `shows.pug` (public listings), and `login.pug` and `maintenance.pug` (the admin
-area, rendered only in `maintenance` mode) — with static assets (`css/`, `js/`) in
-`src/main/resources/static`.
+area, rendered only in `maintenance` mode) — with static assets (`css/`, `js/`, `img/`) in
+`src/main/resources/static`. The listings keep their per-row detail out of the initial page: the
+shared `content-dialog` (wired by `js/content-dialog.js`) opens a title's Plot inline and fetches
+its raw `.nfo` and its cast (the "Actors" layer) on demand, the cast rendered from JSON as a block
+per performer with the bundled `img/no-actor.svg` placeholder when a portrait is missing. The same
+dialog backs the maintenance page's duplicate-scan drill-down, fetching a run's groups as JSON and
+rendering each group's member movies on demand.
+
+The shared `mixins/pagination.pug` mixin renders the movies/shows pagination controls once above
+the table header and once below it, so long listings don't need a scroll back to the top to change
+page. Each listing table also declares a `colgroup` with a fixed width per column and
+`table-layout: fixed`, so column widths stay stable when a sort click re-renders the page with a
+differently-sized result set; long values are truncated with an ellipsis rather than reflowing the
+columns.
 
 Schema changes are Flyway migrations under `src/main/resources/db/migration`. Hibernate never
-generates DDL.
+generates DDL. The duplicate-movie scan persists to `duplicate_scan_run`/`_group`/`_member`
+(`V15`), and `V16` drops the movie identity/imdb unique indexes so doubled entries can be
+catalogued for the scan to reveal (the show tables keep their uniqueness). Because `V8`'s comments
+still describe those now-removed movie indexes, they read as stale — `V16` is the corrective
+migration. `V17` adds the movie file size column, threaded from the scan through staging into the
+live table so the duplicate-scan drill-down can show it.

@@ -36,10 +36,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MovieScanIT extends PostgresIntegrationTestBase {
 
     private static final Path MOVIES_DIR = createTempLibrary();
+    private static final Path SECOND_MOVIES_DIR = createTempLibrary();
 
     @DynamicPropertySource
     static void movieSource(DynamicPropertyRegistry registry) {
-        registry.add("videostorm.sources.movies", MOVIES_DIR::toString);
+        registry.add("videostorm.sources.movies", () -> MOVIES_DIR + "," + SECOND_MOVIES_DIR);
     }
 
     @Autowired
@@ -51,10 +52,13 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     @BeforeEach
     void reset() {
         jdbc.update("DELETE FROM movie_rating_staging");
+        jdbc.update("DELETE FROM movie_actor_staging");
         jdbc.update("DELETE FROM movie_staging");
         jdbc.update("DELETE FROM movie_rating");
+        jdbc.update("DELETE FROM movie_actor");
         jdbc.update("DELETE FROM movie");
-        emptyLibrary();
+        emptyLibrary(MOVIES_DIR);
+        emptyLibrary(SECOND_MOVIES_DIR);
     }
 
     @Test
@@ -88,6 +92,7 @@ class MovieScanIT extends PostgresIntegrationTestBase {
         assertThat(taken.get("year")).isEqualTo(2014);
         assertThat(taken.get("rating_source")).isEqualTo("themoviedb");
         assertThat(taken.get("source_path")).isEqualTo(MOVIES_DIR.resolve("Taken 3 (2014)").toString());
+        assertThat(taken.get("size_bytes")).isEqualTo(FeatureVideo.MIN_BYTES);
         Long takenId = ((Number) taken.get("id")).longValue();
         assertThat(jdbc.queryForObject(
                 "SELECT count(*) FROM movie_rating_staging WHERE movie_id = ?", Long.class, takenId))
@@ -96,6 +101,44 @@ class MovieScanIT extends PostgresIntegrationTestBase {
         // Live catalogue untouched: still just the seeded row, no ratings.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_rating", Long.class)).isZero();
+    }
+
+    @Test
+    void stagesTheCastOfAMovieAndRecordsNoMissingCastIssue() {
+        movieFolder("Taken 3 (2014)", """
+                <movie>
+                  <title>Taken 3</title>
+                  <year>2014</year>
+                  <actor><name>Liam Neeson</name><role>Bryan Mills</role><order>0</order><tmdbid>3896</tmdbid></actor>
+                  <actor><name>Famke Janssen</name><role>Lenore</role><order>1</order></actor>
+                </movie>
+                """, "taken3.mkv");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        Long id = jdbc.queryForObject("SELECT id FROM movie_staging", Long.class);
+        List<Map<String, Object>> actors = jdbc.queryForList(
+                "SELECT name, tmdb_id FROM movie_actor_staging WHERE movie_id = ? ORDER BY billing_order", id);
+        assertThat(actors).extracting(a -> a.get("name")).containsExactly("Liam Neeson", "Famke Janssen");
+        assertThat(actors.get(0).get("tmdb_id")).isEqualTo("3896");
+        assertThat(report.issues())
+                .noneMatch(issue -> issue.type() == RunIssueType.MISSING_FIELD && "cast".equals(issue.field()));
+    }
+
+    @Test
+    void countsAMovieWithNoCastAsMissingData() {
+        Path folder = movieFolder("Heat (1995)", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
+
+        ScanReport report = scan.scan(SourceType.MOVIES);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_actor_staging", Long.class)).isZero();
+        assertThat(report.issues())
+                .filteredOn(issue -> issue.type() == RunIssueType.MISSING_FIELD && "cast".equals(issue.field()))
+                .singleElement()
+                .satisfies(issue -> {
+                    assertThat(issue.path()).isEqualTo(folder.toString());
+                    assertThat(issue.title()).isEqualTo("Heat");
+                });
     }
 
     @Test
@@ -244,24 +287,17 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void catchesASecondFolderOfTheSameFilmSkipsItAndRecordsBothPaths() {
-        Path first = movieFolder("Heat (1995)", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
-        Path second = movieFolder("Heat backup", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
+    void cataloguesEverySourceFolderOfTheSameFilmSoTheDuplicateScanCanRevealIt() {
+        // De-duplication was removed: the same film in two folders is catalogued from both, on purpose,
+        // so the duplicate-movie scan (issue #47) can later reveal the double for deliberate removal.
+        movieFolder("Heat (1995)", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
+        movieFolder("Heat backup", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
 
         ScanReport report = scan.scan(SourceType.MOVIES);
 
-        // Both folders were found; only the first was staged, and the run did not abort.
-        assertThat(report.counts()).isEqualTo(new RunCounts(2, 1));
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isEqualTo(1);
-        assertThat(report.issues())
-                .filteredOn(issue -> issue.type() == RunIssueType.DUPLICATE)
-                .singleElement()
-                .satisfies(issue -> {
-                    assertThat(issue.path()).isEqualTo(second.toString());
-                    assertThat(issue.title()).isEqualTo("Heat");
-                    // The already-catalogued location is kept alongside the skipped one.
-                    assertThat(issue.field()).isEqualTo(first.toString());
-                });
+        assertThat(report.counts()).isEqualTo(new RunCounts(2, 2));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isEqualTo(2);
+        assertThat(report.issues()).noneMatch(issue -> issue.type() == RunIssueType.DUPLICATE);
     }
 
     @Test
@@ -277,16 +313,17 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     }
 
     @Test
-    void treatsFoldersDifferingOnlyInDiacriticsAndPunctuationAsTheSameFilm() {
+    void cataloguesFoldersDifferingOnlyInDiacriticsAndPunctuationSeparately() {
+        // With de-duplication removed, even folders whose titles differ only in diacritics or
+        // punctuation are each catalogued; nothing collapses them at index time any more.
         movieFolder("Amelie", "<movie><title>Amélie</title><year>2001</year></movie>", "a.mkv");
         movieFolder("Amelie 2", "<movie><title>amelie!</title><year>2001</year></movie>", "a.mkv");
 
         ScanReport report = scan.scan(SourceType.MOVIES);
 
-        assertThat(report.counts()).isEqualTo(new RunCounts(2, 1));
-        assertThat(report.issues())
-                .filteredOn(issue -> issue.type() == RunIssueType.DUPLICATE)
-                .hasSize(1);
+        assertThat(report.counts()).isEqualTo(new RunCounts(2, 2));
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM movie_staging", Long.class)).isEqualTo(2);
+        assertThat(report.issues()).noneMatch(issue -> issue.type() == RunIssueType.DUPLICATE);
     }
 
     @Test
@@ -357,8 +394,25 @@ class MovieScanIT extends PostgresIntegrationTestBase {
         assertThat(jdbc.queryForObject("SELECT title FROM movie_staging", String.class)).isEqualTo("Mad Max");
     }
 
+    @Test
+    void cataloguesMoviesFromEveryConfiguredSourceRoot() {
+        movieFolder("Heat (1995)", "<movie><title>Heat</title><year>1995</year></movie>", "heat.mkv");
+        movieFolderIn(SECOND_MOVIES_DIR, "Dune (2021)", "<movie><title>Dune</title><year>2021</year></movie>", "dune.mkv");
+
+        RunCounts counts = scan.scan(SourceType.MOVIES).counts();
+
+        assertThat(counts).isEqualTo(new RunCounts(2, 2));
+        assertThat(jdbc.queryForList("SELECT title FROM movie_staging"))
+                .extracting(row -> row.get("title"))
+                .containsExactlyInAnyOrder("Heat", "Dune");
+    }
+
     private Path createFolder(String name) {
-        Path folder = MOVIES_DIR.resolve(name);
+        return createFolderIn(MOVIES_DIR, name);
+    }
+
+    private Path createFolderIn(Path root, String name) {
+        Path folder = root.resolve(name);
         try {
             Files.createDirectories(folder);
         } catch (IOException e) {
@@ -368,7 +422,11 @@ class MovieScanIT extends PostgresIntegrationTestBase {
     }
 
     private Path movieFolder(String name, String nfo, String videoFile) {
-        Path folder = createFolder(name);
+        return movieFolderIn(MOVIES_DIR, name, nfo, videoFile);
+    }
+
+    private Path movieFolderIn(Path root, String name, String nfo, String videoFile) {
+        Path folder = createFolderIn(root, name);
         write(folder.resolve("movie.nfo"), nfo);
         largeVideo(folder.resolve(videoFile));
         return folder;
@@ -395,9 +453,9 @@ class MovieScanIT extends PostgresIntegrationTestBase {
         }
     }
 
-    private void emptyLibrary() {
-        try (Stream<Path> walk = Files.walk(MOVIES_DIR)) {
-            List<Path> toDelete = walk.filter(path -> !path.equals(MOVIES_DIR))
+    private void emptyLibrary(Path root) {
+        try (Stream<Path> walk = Files.walk(root)) {
+            List<Path> toDelete = walk.filter(path -> !path.equals(root))
                     .sorted(Comparator.reverseOrder())
                     .toList();
             for (Path path : toDelete) {

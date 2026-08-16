@@ -1,6 +1,7 @@
 package de.videostorm.indexing.adapter.out.persistence;
 
 import de.videostorm.indexing.application.port.out.MovieStaging;
+import de.videostorm.indexing.domain.ParsedActor;
 import de.videostorm.indexing.domain.ParsedRating;
 import de.videostorm.indexing.domain.StagedMovie;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -22,13 +23,13 @@ class JdbcMovieStaging implements MovieStaging {
                 title, original_title, year, normalized_title, normalized_original_title,
                 rating_source, rating_value, rating_max, rating_votes,
                 genres, runtime_minutes, resolution, plot, set_name, collection_id,
-                imdb_id, tvdb_id, tmdb_id, raw_nfo, slug, source_path,
+                imdb_id, tvdb_id, tmdb_id, raw_nfo, slug, source_path, size_bytes,
                 derived_title, derived_year)
             VALUES (
                 :title, :originalTitle, :year, :normalizedTitle, :normalizedOriginalTitle,
                 :ratingSource, :ratingValue, :ratingMax, :ratingVotes,
                 :genres, :runtimeMinutes, :resolution, :plot, :setName, :collectionId,
-                :imdbId, :tvdbId, :tmdbId, :rawNfo, :slug, :sourcePath,
+                :imdbId, :tvdbId, :tmdbId, :rawNfo, :slug, :sourcePath, :sizeBytes,
                 :derivedTitle, FALSE)
             RETURNING id
             """;
@@ -36,6 +37,11 @@ class JdbcMovieStaging implements MovieStaging {
     private static final String INSERT_RATING = """
             INSERT INTO movie_rating_staging (movie_id, source, value, max, votes)
             VALUES (:movieId, :source, :value, :max, :votes)
+            """;
+
+    private static final String INSERT_ACTOR = """
+            INSERT INTO movie_actor_staging (movie_id, name, role, billing_order, thumb, tmdb_id)
+            VALUES (:movieId, :name, :role, :billingOrder, :thumb, :tmdbId)
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -47,8 +53,9 @@ class JdbcMovieStaging implements MovieStaging {
     @Override
     @Transactional
     public void clear() {
-        // Child first: the staging FK forbids deleting a movie while its ratings remain.
+        // Children first: the staging FKs forbid deleting a movie while its ratings or actors remain.
         jdbc.getJdbcTemplate().update("DELETE FROM movie_rating_staging");
+        jdbc.getJdbcTemplate().update("DELETE FROM movie_actor_staging");
         jdbc.getJdbcTemplate().update("DELETE FROM movie_staging");
     }
 
@@ -78,7 +85,8 @@ class JdbcMovieStaging implements MovieStaging {
                 .addValue("tmdbId", movie.tmdbId())
                 .addValue("rawNfo", movie.rawNfo())
                 .addValue("slug", movie.slug())
-                .addValue("sourcePath", movie.sourcePath());
+                .addValue("sourcePath", movie.sourcePath())
+                .addValue("sizeBytes", movie.sizeBytes());
 
         Long movieId = jdbc.queryForObject(INSERT_MOVIE, params, Long.class);
 
@@ -89,6 +97,16 @@ class JdbcMovieStaging implements MovieStaging {
                     .addValue("value", rating.value())
                     .addValue("max", rating.max())
                     .addValue("votes", rating.votes()));
+        }
+
+        for (ParsedActor actor : movie.actors()) {
+            jdbc.update(INSERT_ACTOR, new MapSqlParameterSource()
+                    .addValue("movieId", movieId)
+                    .addValue("name", actor.name())
+                    .addValue("role", actor.role())
+                    .addValue("billingOrder", actor.order())
+                    .addValue("thumb", actor.thumb())
+                    .addValue("tmdbId", actor.tmdbId()));
         }
         return movieId;
     }

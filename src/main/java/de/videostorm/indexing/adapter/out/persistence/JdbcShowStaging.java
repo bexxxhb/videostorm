@@ -1,6 +1,7 @@
 package de.videostorm.indexing.adapter.out.persistence;
 
 import de.videostorm.indexing.application.port.out.ShowStaging;
+import de.videostorm.indexing.domain.ParsedActor;
 import de.videostorm.indexing.domain.ParsedRating;
 import de.videostorm.indexing.domain.StagedEpisode;
 import de.videostorm.indexing.domain.StagedShow;
@@ -42,6 +43,11 @@ class JdbcShowStaging implements ShowStaging {
             VALUES (:showId, :source, :value, :max, :votes)
             """;
 
+    private static final String INSERT_ACTOR = """
+            INSERT INTO show_actor_staging (show_id, name, role, billing_order, thumb, tmdb_id)
+            VALUES (:showId, :name, :role, :billingOrder, :thumb, :tmdbId)
+            """;
+
     private static final String INSERT_EPISODE = """
             INSERT INTO episode_staging (show_id, season_number, episode_number)
             VALUES (:showId, :seasonNumber, :episodeNumber)
@@ -56,8 +62,9 @@ class JdbcShowStaging implements ShowStaging {
     @Override
     @Transactional
     public void clear() {
-        // Children first: the staging FKs forbid deleting a show while its ratings or episodes remain.
+        // Children first: the staging FKs forbid deleting a show while its ratings, actors or episodes remain.
         jdbc.getJdbcTemplate().update("DELETE FROM show_rating_staging");
+        jdbc.getJdbcTemplate().update("DELETE FROM show_actor_staging");
         jdbc.getJdbcTemplate().update("DELETE FROM episode_staging");
         jdbc.getJdbcTemplate().update("DELETE FROM show_staging");
     }
@@ -96,6 +103,16 @@ class JdbcShowStaging implements ShowStaging {
                     .addValue("value", rating.value())
                     .addValue("max", rating.max())
                     .addValue("votes", rating.votes()));
+        }
+
+        for (ParsedActor actor : show.actors()) {
+            jdbc.update(INSERT_ACTOR, new MapSqlParameterSource()
+                    .addValue("showId", showId)
+                    .addValue("name", actor.name())
+                    .addValue("role", actor.role())
+                    .addValue("billingOrder", actor.order())
+                    .addValue("thumb", actor.thumb())
+                    .addValue("tmdbId", actor.tmdbId()));
         }
         return showId;
     }

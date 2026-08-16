@@ -10,9 +10,14 @@ package de.videostorm.indexing.domain;
  */
 public record RunIssue(RunIssueType type, String path, String title, String field) {
 
-    /** The two fields the run report tracks as gaps: a derived title and an unknown year. */
+    /**
+     * The fields the run report counts as missing data: a derived title, an unknown year and an empty
+     * cast. {@link RunGapSummary} breaks out title and year separately for its own tally; every one of
+     * them feeds the distinct-entry "missing data" count.
+     */
     public static final String TITLE_FIELD = "title";
     public static final String YEAR_FIELD = "year";
+    public static final String CAST_FIELD = "cast";
 
     public RunIssue {
         if (type == null) {
@@ -33,7 +38,7 @@ public record RunIssue(RunIssueType type, String path, String title, String fiel
         return new RunIssue(RunIssueType.IGNORED_VIDEO, path, title, null);
     }
 
-    /** A catalogued entry that is thin in {@code field} — {@link #TITLE_FIELD} or {@link #YEAR_FIELD}. */
+    /** A catalogued entry thin in {@code field} — {@link #TITLE_FIELD}, {@link #YEAR_FIELD} or {@link #CAST_FIELD}. */
     public static RunIssue missingField(String path, String title, String field) {
         return new RunIssue(RunIssueType.MISSING_FIELD, path, title, field);
     }

@@ -14,6 +14,7 @@ public record ParsedMovie(
         Integer year,
         List<ParsedRating> ratings,
         List<String> genres,
+        List<ParsedActor> actors,
         Integer runtimeMinutes,
         String plot,
         String setName,
@@ -25,6 +26,7 @@ public record ParsedMovie(
     public ParsedMovie {
         ratings = ratings == null ? List.of() : List.copyOf(ratings);
         genres = genres == null ? List.of() : List.copyOf(genres);
+        actors = actors == null ? List.of() : List.copyOf(actors);
     }
 
     /**
@@ -33,6 +35,6 @@ public record ParsedMovie(
      * downstream supply a folder-derived title and a zero year.
      */
     public static ParsedMovie absent() {
-        return new ParsedMovie(null, null, null, null, null, null, null, null, null, null, null, null);
+        return new ParsedMovie(null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 }

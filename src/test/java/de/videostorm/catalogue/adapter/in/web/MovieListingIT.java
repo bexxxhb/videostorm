@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -19,8 +20,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -42,6 +45,7 @@ class MovieListingIT extends PostgresIntegrationTestBase {
 
     @BeforeEach
     void clearCatalogue() {
+        jdbcTemplate.update("DELETE FROM movie_actor");
         jdbcTemplate.update("DELETE FROM movie");
     }
 
@@ -65,6 +69,7 @@ class MovieListingIT extends PostgresIntegrationTestBase {
                 .contains("<th>Genres</th>")
                 .contains("<th>Runtime</th>")
                 .contains("<th>Plot</th>")
+                .contains("<th>Actors</th>")
                 .contains("<th>IMDb</th>")
                 .contains("<th>nfo raw</th>");
     }
@@ -214,6 +219,61 @@ class MovieListingIT extends PostgresIntegrationTestBase {
                 TitleNormalizer.normalize("Unscraped Folder"));
 
         mockMvc.perform(get("/movies/" + id + "/nfo")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void aMovieWithCastRendersAnActorsLinkButCarriesNoActorDetailInTheListingDom() throws Exception {
+        long id = insertBareMovie("Heat");
+        insertActor(id, "Al Pacino", "Vincent Hanna", 0, "http://image.tmdb.org/t/p/w185/pacino.jpg");
+
+        String html = render("/movies");
+
+        assertThat(html).contains(
+                "<a class=\"actors-link\" href=\"/movies/" + id + "/actors\" data-title=\"Heat\">Actors</a>");
+        assertThat(html)
+                .doesNotContain("Al Pacino")
+                .doesNotContain("Vincent Hanna")
+                .doesNotContain("image.tmdb.org");
+    }
+
+    @Test
+    void aMovieWithoutCastRendersAnEmptyCellWithNoActorsLink() throws Exception {
+        insertMovie("Unscraped Folder", null, null, null, List.of(), null);
+
+        String html = render("/movies");
+
+        assertThat(html).doesNotContain("actors-link");
+    }
+
+    @Test
+    void theActorsEndpointServesTheCastAsJsonTopBilledFirstWithHttpsThumbs() throws Exception {
+        long id = insertBareMovie("Heat");
+        insertActor(id, "Al Pacino", "Vincent Hanna", 0, "http://image.tmdb.org/t/p/w185/pacino.jpg");
+        insertActor(id, "Extra", null, 1, null);
+
+        mockMvc.perform(get("/movies/" + id + "/actors"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$[0].name").value("Al Pacino"))
+                .andExpect(jsonPath("$[0].role").value("Vincent Hanna"))
+                .andExpect(jsonPath("$[0].thumbUrl").value("https://image.tmdb.org/t/p/w185/pacino.jpg"))
+                .andExpect(jsonPath("$[1].name").value("Extra"))
+                .andExpect(jsonPath("$[1].role").value(nullValue()))
+                .andExpect(jsonPath("$[1].thumbUrl").value(nullValue()));
+    }
+
+    @Test
+    void theActorsEndpointReturnsAnEmptyArrayWhenTheMovieHasNoCast() throws Exception {
+        long id = insertBareMovie("Unscraped Folder");
+
+        mockMvc.perform(get("/movies/" + id + "/actors"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+    }
+
+    @Test
+    void theActorsEndpointReturns404ForAnUnknownMovie() throws Exception {
+        mockMvc.perform(get("/movies/999999/actors")).andExpect(status().isNotFound());
     }
 
     @Test
@@ -499,6 +559,24 @@ class MovieListingIT extends PostgresIntegrationTestBase {
                 """,
                 title, 0, normalizedTitle, new GenreList(List.of()).toStorage(), rawNfo, slug);
         return jdbcTemplate.queryForObject("SELECT id FROM movie WHERE slug = ?", Long.class, slug);
+    }
+
+    private long insertBareMovie(String title) {
+        String normalizedTitle = TitleNormalizer.normalize(title);
+        String slug = normalizedTitle.replace(' ', '-') + "-" + System.nanoTime();
+
+        jdbcTemplate.update("""
+                INSERT INTO movie (title, year, normalized_title, genres, slug)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                title, 0, normalizedTitle, new GenreList(List.of()).toStorage(), slug);
+        return jdbcTemplate.queryForObject("SELECT id FROM movie WHERE slug = ?", Long.class, slug);
+    }
+
+    private void insertActor(long movieId, String name, String role, Integer billingOrder, String thumb) {
+        jdbcTemplate.update(
+                "INSERT INTO movie_actor (movie_id, name, role, billing_order, thumb) VALUES (?, ?, ?, ?, ?)",
+                movieId, name, role, billingOrder, thumb);
     }
 
     private void insertMovie(

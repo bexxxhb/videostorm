@@ -1,0 +1,45 @@
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      TZ: Europe/Berlin
+      POSTGRES_DB: ${POSTGRES_DB:-videostorm}
+      POSTGRES_USER: ${POSTGRES_USER:-videostorm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-videostorm}
+    volumes:
+      # Named volume: the catalogue survives `docker compose down` and container rebuilds.
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-videostorm} -d ${POSTGRES_DB:-videostorm}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+    ports:
+      - "6432:5432"
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+    depends_on:
+      db:
+        # Flyway runs at startup, so the database must be accepting connections first.
+        condition: service_healthy
+    environment:
+      TZ: Europe/Berlin
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-videostorm}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-videostorm}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-videostorm}
+      # 'presentation' (view-only default: maintenance & login disabled and hidden) or 'maintenance'
+      # (full behaviour). Switchable purely via .env - no image rebuild.
+      APPLICATION_OPERATING_MODE: ${APPLICATION_OPERATING_MODE:-presentation}
+      # Change these for anything beyond local use - the maintenance login is only as good as this password.
+      VIDEOSTORM_ADMIN_USERNAME: ${VIDEOSTORM_ADMIN_USERNAME:-admin}
+      VIDEOSTORM_ADMIN_PASSWORD: ${VIDEOSTORM_ADMIN_PASSWORD:-changeme}
+    ports:
+      - "8090:8080"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

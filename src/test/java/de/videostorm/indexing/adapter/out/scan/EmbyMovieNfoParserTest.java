@@ -1,5 +1,6 @@
 package de.videostorm.indexing.adapter.out.scan;
 
+import de.videostorm.indexing.domain.ParsedActor;
 import de.videostorm.indexing.domain.ParsedMovie;
 import de.videostorm.indexing.domain.ParsedRating;
 import org.junit.jupiter.api.Test;
@@ -214,6 +215,94 @@ class EmbyMovieNfoParserTest {
     void rejectsAWellFormedFileWhoseRootIsNotMovie() {
         assertThatThrownBy(() -> parser.parse("<tvshow><title>Wrong root</title></tvshow>"))
                 .isInstanceOf(NfoParseException.class);
+    }
+
+    @Test
+    void extractsTheCastPreservingBillingOrderWithTheTmdbPersonId() {
+        ParsedMovie movie = parser.parse("""
+                <movie>
+                  <title>Taken 3</title>
+                  <actor>
+                    <name>Liam Neeson</name>
+                    <role>Bryan Mills</role>
+                    <order>0</order>
+                    <thumb>http://image/neeson.jpg</thumb>
+                    <tmdbid>3896</tmdbid>
+                  </actor>
+                  <actor>
+                    <name>Famke Janssen</name>
+                    <role>Lenore</role>
+                    <order>1</order>
+                  </actor>
+                </movie>
+                """);
+
+        assertThat(movie.actors()).hasSize(2);
+        ParsedActor lead = movie.actors().get(0);
+        assertThat(lead.name()).isEqualTo("Liam Neeson");
+        assertThat(lead.role()).isEqualTo("Bryan Mills");
+        assertThat(lead.order()).isZero();
+        assertThat(lead.thumb()).isEqualTo("http://image/neeson.jpg");
+        assertThat(lead.tmdbId()).isEqualTo("3896");
+        // The supporting actor omitted thumb and tmdbid; both are left null, only that field costs.
+        ParsedActor support = movie.actors().get(1);
+        assertThat(support.name()).isEqualTo("Famke Janssen");
+        assertThat(support.order()).isEqualTo(1);
+        assertThat(support.thumb()).isNull();
+        assertThat(support.tmdbId()).isNull();
+    }
+
+    @Test
+    void hasAnEmptyCastWhenTheFilmListsNoActors() {
+        ParsedMovie movie = parser.parse("<movie><title>Castless</title></movie>");
+
+        assertThat(movie.actors()).isEmpty();
+    }
+
+    @Test
+    void skipsAnActorWithABlankOrMissingNameWithoutFailingTheEntry() {
+        ParsedMovie movie = parser.parse("""
+                <movie>
+                  <title>One Named Actor</title>
+                  <actor><role>Nobody</role><order>0</order></actor>
+                  <actor><name>  </name><role>Blank</role></actor>
+                  <actor><name>Real Person</name></actor>
+                </movie>
+                """);
+
+        // The nameless and blank-named entries are dropped; only the named actor survives.
+        assertThat(movie.actors()).extracting(ParsedActor::name).containsExactly("Real Person");
+    }
+
+    @Test
+    void defaultsBillingOrderToDocumentPositionWhenTheOrderElementIsAbsent() {
+        ParsedMovie movie = parser.parse("""
+                <movie>
+                  <title>Unordered Cast</title>
+                  <actor><name>First Billed</name></actor>
+                  <actor><name>Second Billed</name></actor>
+                </movie>
+                """);
+
+        assertThat(movie.actors()).extracting(ParsedActor::name)
+                .containsExactly("First Billed", "Second Billed");
+        assertThat(movie.actors()).extracting(ParsedActor::order).containsExactly(0, 1);
+    }
+
+    @Test
+    void preservesExplicitOrderValuesEvenWhenTheyRunAgainstDocumentOrder() {
+        ParsedMovie movie = parser.parse("""
+                <movie>
+                  <title>Explicitly Ordered</title>
+                  <actor><name>Listed First</name><order>2</order></actor>
+                  <actor><name>Listed Second</name><order>0</order></actor>
+                </movie>
+                """);
+
+        // The list stays in document order; each actor keeps the billing position the file gave it.
+        assertThat(movie.actors()).extracting(ParsedActor::name)
+                .containsExactly("Listed First", "Listed Second");
+        assertThat(movie.actors()).extracting(ParsedActor::order).containsExactly(2, 0);
     }
 
     @Test

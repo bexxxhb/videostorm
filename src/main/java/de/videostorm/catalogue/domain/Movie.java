@@ -13,5 +13,6 @@ public record Movie(
         Optional<String> resolution,
         Optional<String> imdbId,
         Optional<String> plot,
-        boolean hasRawNfo) {
+        boolean hasRawNfo,
+        boolean hasCast) {
 }

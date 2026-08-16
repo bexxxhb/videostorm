@@ -35,10 +35,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ShowScanIT extends PostgresIntegrationTestBase {
 
     private static final Path SHOWS_DIR = createTempLibrary();
+    private static final Path SECOND_SHOWS_DIR = createTempLibrary();
 
     @DynamicPropertySource
     static void showSource(DynamicPropertyRegistry registry) {
-        registry.add("videostorm.sources.shows", SHOWS_DIR::toString);
+        registry.add("videostorm.sources.shows", () -> SHOWS_DIR + "," + SECOND_SHOWS_DIR);
     }
 
     @Autowired
@@ -50,19 +51,24 @@ class ShowScanIT extends PostgresIntegrationTestBase {
     @BeforeEach
     void reset() {
         jdbc.update("DELETE FROM show_rating_staging");
+        jdbc.update("DELETE FROM show_actor_staging");
         jdbc.update("DELETE FROM episode_staging");
         jdbc.update("DELETE FROM show_staging");
         jdbc.update("DELETE FROM show_rating");
+        jdbc.update("DELETE FROM show_actor");
         jdbc.update("DELETE FROM episode");
         jdbc.update("DELETE FROM show");
         // The movie side is cleared too, symmetric to MovieScanIT: this class asserts a show scan
         // leaves the movie catalogue and its staging untouched, so both must start empty regardless of
         // what a movie IT staged before it.
         jdbc.update("DELETE FROM movie_rating_staging");
+        jdbc.update("DELETE FROM movie_actor_staging");
         jdbc.update("DELETE FROM movie_staging");
         jdbc.update("DELETE FROM movie_rating");
+        jdbc.update("DELETE FROM movie_actor");
         jdbc.update("DELETE FROM movie");
-        emptyLibrary();
+        emptyLibrary(SHOWS_DIR);
+        emptyLibrary(SECOND_SHOWS_DIR);
     }
 
     @Test
@@ -109,6 +115,44 @@ class ShowScanIT extends PostgresIntegrationTestBase {
         // Live catalogue untouched: still just the seeded row, no ratings.
         assertThat(jdbc.queryForObject("SELECT count(*) FROM show", Long.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM show_rating", Long.class)).isZero();
+    }
+
+    @Test
+    void stagesTheCastOfAShowAndRecordsNoMissingCastIssue() {
+        showFolder("Breaking Bad (2008)", """
+                <tvshow>
+                  <title>Breaking Bad</title>
+                  <premiered>2008-01-20</premiered>
+                  <actor><name>Bryan Cranston</name><role>Walter White</role><order>0</order><tmdbid>17419</tmdbid></actor>
+                  <actor><name>Aaron Paul</name><role>Jesse Pinkman</role><order>1</order></actor>
+                </tvshow>
+                """);
+
+        ScanReport report = scan.scan(SourceType.SHOWS);
+
+        Long id = jdbc.queryForObject("SELECT id FROM show_staging", Long.class);
+        List<Map<String, Object>> actors = jdbc.queryForList(
+                "SELECT name, tmdb_id FROM show_actor_staging WHERE show_id = ? ORDER BY billing_order", id);
+        assertThat(actors).extracting(a -> a.get("name")).containsExactly("Bryan Cranston", "Aaron Paul");
+        assertThat(actors.get(0).get("tmdb_id")).isEqualTo("17419");
+        assertThat(report.issues())
+                .noneMatch(issue -> issue.type() == RunIssueType.MISSING_FIELD && "cast".equals(issue.field()));
+    }
+
+    @Test
+    void countsAShowWithNoCastAsMissingData() {
+        showFolder("Castless (2020)", "<tvshow><title>Castless</title><premiered>2020-01-01</premiered></tvshow>");
+
+        ScanReport report = scan.scan(SourceType.SHOWS);
+
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM show_actor_staging", Long.class)).isZero();
+        assertThat(report.issues())
+                .filteredOn(issue -> issue.type() == RunIssueType.MISSING_FIELD && "cast".equals(issue.field()))
+                .singleElement()
+                .satisfies(issue -> {
+                    assertThat(issue.path()).isEqualTo(SHOWS_DIR.resolve("Castless (2020)").toString());
+                    assertThat(issue.title()).isEqualTo("Castless");
+                });
     }
 
     @Test
@@ -267,6 +311,19 @@ class ShowScanIT extends PostgresIntegrationTestBase {
         assertThat(episodesOf("odd naming")).isEmpty();
     }
 
+    @Test
+    void cataloguesShowsFromEveryConfiguredSourceRoot() {
+        showFolder("Breaking Bad (2008)", "<tvshow><title>Breaking Bad</title></tvshow>");
+        showFolderIn(SECOND_SHOWS_DIR, "The Wire (2002)", "<tvshow><title>The Wire</title></tvshow>");
+
+        RunCounts counts = scan.scan(SourceType.SHOWS).counts();
+
+        assertThat(counts).isEqualTo(new RunCounts(2, 2));
+        assertThat(jdbc.queryForList("SELECT title FROM show_staging"))
+                .extracting(row -> row.get("title"))
+                .containsExactlyInAnyOrder("Breaking Bad", "The Wire");
+    }
+
     /** The episodes staged for a show as {@code S<season>E<episode>}, ordered by season then episode. */
     private List<String> episodesOf(String normalizedTitle) {
         return jdbc.query("""
@@ -290,7 +347,11 @@ class ShowScanIT extends PostgresIntegrationTestBase {
     }
 
     private Path createFolder(String name) {
-        Path folder = SHOWS_DIR.resolve(name);
+        return createFolderIn(SHOWS_DIR, name);
+    }
+
+    private Path createFolderIn(Path root, String name) {
+        Path folder = root.resolve(name);
         try {
             Files.createDirectories(folder);
         } catch (IOException e) {
@@ -300,7 +361,11 @@ class ShowScanIT extends PostgresIntegrationTestBase {
     }
 
     private Path showFolder(String name, String nfo) {
-        Path folder = createFolder(name);
+        return showFolderIn(SHOWS_DIR, name, nfo);
+    }
+
+    private Path showFolderIn(Path root, String name, String nfo) {
+        Path folder = createFolderIn(root, name);
         write(folder.resolve("tvshow.nfo"), nfo);
         return folder;
     }
@@ -313,9 +378,9 @@ class ShowScanIT extends PostgresIntegrationTestBase {
         }
     }
 
-    private void emptyLibrary() {
-        try (Stream<Path> walk = Files.walk(SHOWS_DIR)) {
-            List<Path> toDelete = walk.filter(path -> !path.equals(SHOWS_DIR))
+    private void emptyLibrary(Path root) {
+        try (Stream<Path> walk = Files.walk(root)) {
+            List<Path> toDelete = walk.filter(path -> !path.equals(root))
                     .sorted(Comparator.reverseOrder())
                     .toList();
             for (Path path : toDelete) {

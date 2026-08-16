@@ -50,7 +50,7 @@ class ShowRowTest {
     void aPresentRatingAndStatusAreFormatted() {
         Show show = new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED,
                 Optional.of(new Rating("TVDB", new BigDecimal("9.5"))), GenreList.EMPTY, Optional.empty(),
-                5, 62, Optional.empty(), false);
+                5, 62, Optional.empty(), false, false);
 
         ShowRow row = ShowRow.from(show, 0, 1);
 
@@ -62,7 +62,7 @@ class ShowRowTest {
     @Test
     void seasonAndEpisodeCountsAreRenderedAsStrings() {
         Show show = new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(),
-                GenreList.EMPTY, Optional.empty(), 5, 62, Optional.empty(), false);
+                GenreList.EMPTY, Optional.empty(), 5, 62, Optional.empty(), false, false);
 
         ShowRow row = ShowRow.from(show, 0, 1);
 
@@ -104,7 +104,7 @@ class ShowRowTest {
 
     private static Show showWithImdbId(String imdbId) {
         return new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(), GenreList.EMPTY,
-                Optional.empty(), 5, 62, Optional.of(imdbId), false);
+                Optional.empty(), 5, 62, Optional.of(imdbId), false, false);
     }
 
     @Test
@@ -135,7 +135,7 @@ class ShowRowTest {
 
     private static Show showWithPlot(String plot) {
         return new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(), GenreList.EMPTY,
-                Optional.of(plot), 5, 62, Optional.empty(), false);
+                Optional.of(plot), 5, 62, Optional.empty(), false, false);
     }
 
     @Test
@@ -156,7 +156,28 @@ class ShowRowTest {
 
     private static Show showWithRawNfo() {
         return new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(), GenreList.EMPTY,
-                Optional.empty(), 5, 62, Optional.empty(), true);
+                Optional.empty(), 5, 62, Optional.empty(), true, false);
+    }
+
+    @Test
+    void aShowWithoutCastHasNoLinkAndAnEmptyUrl() {
+        ShowRow row = ShowRow.from(minimalShow(), 0, 1);
+
+        assertThat(row.isHasActors()).isFalse();
+        assertThat(row.getActorsUrl()).isEmpty();
+    }
+
+    @Test
+    void aShowWithCastLinksToItsOnDemandActorsEndpoint() {
+        ShowRow row = ShowRow.from(showWithCast(), 0, 1);
+
+        assertThat(row.isHasActors()).isTrue();
+        assertThat(row.getActorsUrl()).isEqualTo("/shows/1/actors");
+    }
+
+    private static Show showWithCast() {
+        return new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED, Optional.empty(), GenreList.EMPTY,
+                Optional.empty(), 5, 62, Optional.empty(), false, true);
     }
 
     private static String decode(String base64) {
@@ -165,6 +186,6 @@ class ShowRowTest {
 
     private static Show minimalShow() {
         return new Show(1, "Unscraped Folder", Year.UNKNOWN, ShowStatus.UNKNOWN, Optional.empty(), GenreList.EMPTY,
-                Optional.empty(), 0, 0, Optional.empty(), false);
+                Optional.empty(), 0, 0, Optional.empty(), false, false);
     }
 }

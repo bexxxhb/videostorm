@@ -58,6 +58,12 @@ class MovieEntity {
     @Formula("(raw_nfo IS NOT NULL)")
     private boolean hasRawNfo;
 
+    // Whether any actor is stored for this movie, so the listing renders the "Actors" link only when
+    // there is a cast to open. The cast itself is fetched on demand, never hydrated with a listing row.
+    // Hibernate qualifies the unaliased `id` with this entity's table alias.
+    @Formula("(EXISTS (SELECT 1 FROM movie_actor a WHERE a.movie_id = id))")
+    private boolean hasCast;
+
     // Read-side sort keys (issue #35). Each maps a "no value" to NULL so the listing can push those
     // entries to the end of the order — in both directions — with NULLS LAST, which a raw column cannot
     // do for the non-null sentinels (a blank title, the year 0). Hibernate qualifies the unaliased

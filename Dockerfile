@@ -14,6 +14,11 @@ RUN mvn -B -Dmaven.repo.local=/root/.m2/repository -DskipTests package \
 
 FROM eclipse-temurin:21-jre-alpine
 
+# tzdata backs the container's system clock/logs with Europe/Berlin; the JVM itself resolves
+# ZoneId.of("Europe/Berlin") from its own bundled tz database regardless.
+RUN apk add --no-cache tzdata
+ENV TZ=Europe/Berlin
+
 # The application never writes to the filesystem and must never run as root.
 RUN addgroup -S -g 1000 videostorm \
     && adduser -S -u 1000 -G videostorm -H -s /sbin/nologin videostorm

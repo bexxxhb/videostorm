@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 class AdminUserDetailsServiceTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withPropertyValues("application.operating.mode=maintenance")
             .withBean(PropertySourcesPlaceholderConfigurer.class, PropertySourcesPlaceholderConfigurer::new)
             .withBean(PasswordEncoder.class, BCryptPasswordEncoder::new)
             .withBean(AdminUserDetailsService.class);

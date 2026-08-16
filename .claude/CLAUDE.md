@@ -39,4 +39,6 @@ Issues live in GitHub Issues for `bexxxhb/videostorm`, via the `gh` CLI. See `do
 - If necessary work with temporary files in the ( temporary ) project directory ( /Users/marcelklaas/.claude/projects/-Users-marcelklaas-devp-videostorm/ ) 
 - DO NOT output complete files unless explicitly requested. Use brief code snippets for changes
 - DO NOT output changed lines in code files into the session window
-- DO NOT output bash command output into the session window
+- DO NOT output bash command output into the session window, use temporary files
+- DO NOT output diff command results into the session window, use temporary files
+- DO NOT output the implementation plan of a ticket into the session window. Use a temporary file for that.

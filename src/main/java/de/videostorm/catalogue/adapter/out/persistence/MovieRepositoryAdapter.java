@@ -3,6 +3,7 @@ package de.videostorm.catalogue.adapter.out.persistence;
 import de.videostorm.catalogue.application.MovieSort;
 import de.videostorm.catalogue.application.MovieSortField;
 import de.videostorm.catalogue.application.port.out.MovieRepository;
+import de.videostorm.catalogue.domain.CastMember;
 import de.videostorm.catalogue.domain.GenreList;
 import de.videostorm.catalogue.domain.Movie;
 import de.videostorm.catalogue.domain.Rating;
@@ -41,6 +42,17 @@ class MovieRepositoryAdapter implements MovieRepository {
     @Override
     public Optional<String> findRawNfo(long id) {
         return jpaRepository.findRawNfoById(id);
+    }
+
+    @Override
+    public Optional<List<CastMember>> findCast(long id) {
+        // Distinguish an unknown movie (empty Optional -> 404) from a movie with no cast (present, empty).
+        if (!jpaRepository.existsById(id)) {
+            return Optional.empty();
+        }
+        return Optional.of(jpaRepository.findCastByMovieId(id).stream()
+                .map(CastRow::toCastMember)
+                .toList());
     }
 
     private static Sort sortOf(MovieSort sort) {
@@ -88,6 +100,7 @@ class MovieRepositoryAdapter implements MovieRepository {
                 Optional.ofNullable(entity.getResolution()),
                 Optional.ofNullable(entity.getImdbId()),
                 Optional.ofNullable(entity.getPlot()),
-                entity.isHasRawNfo());
+                entity.isHasRawNfo(),
+                entity.isHasCast());
     }
 }

@@ -1,5 +1,6 @@
 package de.videostorm.indexing.adapter.out.scan;
 
+import de.videostorm.indexing.domain.ParsedActor;
 import de.videostorm.indexing.domain.ParsedRating;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -92,6 +93,34 @@ final class EmbyNfo {
             return List.of();
         }
         return List.of(new ParsedRating("TMDB", value, null, integer(text(root, "votes")), true));
+    }
+
+    /**
+     * The cast written as repeated top-level {@code <actor>} children, in document order. An actor with a
+     * blank or missing {@code <name>} is dropped — not a stored row and not a failure — so a stray empty
+     * node never becomes a nameless cast member. Billing order is read from {@code <order>} where present
+     * and otherwise defaults to the actor's position among the kept entries (0-based), so a file that omits
+     * it still yields a stable top-billed-first ordering; {@code role}, {@code thumb} and {@code tmdbid} are
+     * each optional and become {@code null} when absent.
+     */
+    static List<ParsedActor> actors(Element root) {
+        List<ParsedActor> actors = new ArrayList<>();
+        int position = 0;
+        for (Element actor : children(root, "actor")) {
+            String name = text(actor, "name");
+            if (name == null) {
+                continue;
+            }
+            Integer order = integer(text(actor, "order"));
+            actors.add(new ParsedActor(
+                    name,
+                    text(actor, "role"),
+                    order == null ? position : order,
+                    text(actor, "thumb"),
+                    text(actor, "tmdbid")));
+            position++;
+        }
+        return actors;
     }
 
     static List<String> genres(Element root) {

@@ -1,5 +1,7 @@
 extends layout
 
+include mixins/pagination
+
 block content
   form.search(method="get", action="/shows")
     input.search__input(type="search", name="q", value=query, placeholder="Search title, genre or started")
@@ -7,7 +9,22 @@ block content
     input(type="hidden", name="dir", value=sort.direction)
     button.search__button(type="submit") Search
 
+  +pagination(pagination, pageNumber, totalPages, totalElements)
+
   table.catalogue
+    colgroup
+      col.col--index
+      col.col--title
+      col.col--year
+      col.col--status
+      col.col--rating
+      col.col--genres
+      col.col--seasons
+      col.col--episodes
+      col.col--plot
+      col.col--actors
+      col.col--imdb
+      col.col--rawnfo
     thead
       tr
         th #
@@ -22,6 +39,7 @@ block content
         th Seasons
         th Total Episodes
         th Plot
+        th Actors
         th IMDb
         th nfo raw
     tbody
@@ -39,27 +57,13 @@ block content
             if show.hasPlot
               a.plot-link(href="#", data-plot=show.plotBase64, data-title=show.title) Plot
           td
+            if show.hasActors
+              a.actors-link(href=show.actorsUrl, data-title=show.title) Actors
+          td
             if show.imdbUrl
               a.imdb-link(href=show.imdbUrl)= show.imdbLinkText
           td
             if show.hasRawNfo
               a.rawnfo-link(href=show.rawNfoUrl, data-title=show.title) Raw data
 
-  nav.pagination
-    if pagination.firstPageUrl
-      a.pagination__link(href=pagination.firstPageUrl) First
-    else
-      span.pagination__link.pagination__link--disabled First
-    if pagination.previousPageUrl
-      a.pagination__link(href=pagination.previousPageUrl) Previous
-    else
-      span.pagination__link.pagination__link--disabled Previous
-    span.pagination__status Page #{pageNumber} of #{totalPages} (#{totalElements} total)
-    if pagination.nextPageUrl
-      a.pagination__link(href=pagination.nextPageUrl) Next
-    else
-      span.pagination__link.pagination__link--disabled Next
-    if pagination.lastPageUrl
-      a.pagination__link(href=pagination.lastPageUrl) Last
-    else
-      span.pagination__link.pagination__link--disabled Last
+  +pagination(pagination, pageNumber, totalPages, totalElements)
