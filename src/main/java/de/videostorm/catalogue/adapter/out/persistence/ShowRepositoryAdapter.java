@@ -87,7 +87,7 @@ class ShowRepositoryAdapter implements ShowRepository {
 
     private static Show toDomain(ShowEntity entity) {
         Optional<Rating> rating = entity.getRatingSource() != null && entity.getRatingValue() != null
-                ? Optional.of(new Rating(entity.getRatingSource(), entity.getRatingValue()))
+                ? Optional.of(new Rating(entity.getRatingSource(), entity.getRatingValue(), entity.getRatingVotes()))
                 : Optional.empty();
 
         return new Show(

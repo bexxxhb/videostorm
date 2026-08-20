@@ -46,15 +46,15 @@ class MovieRowTest {
     }
 
     @Test
-    void aPresentRatingIsFormattedWithItsProvider() {
+    void aPresentRatingIsFormattedWithItsVoteCount() {
         Movie movie = new Movie(1, "Heat", Year.of(1995),
-                Optional.of(new Rating("TMDB", new BigDecimal("7.8"))), GenreList.EMPTY, Optional.of(170),
+                Optional.of(new Rating("TMDB", new BigDecimal("7.8"), 1234)), GenreList.EMPTY, Optional.of(170),
                 Optional.empty(), Optional.empty(), Optional.empty(), false, false);
 
         MovieRow row = MovieRow.from(movie, 0, 1);
 
         assertThat(row.getYear()).isEqualTo("1995");
-        assertThat(row.getRatingDisplay()).isEqualTo("7.8 (TMDB)");
+        assertThat(row.getRatingDisplay()).isEqualTo("7.8 (1.234 votes)");
         assertThat(row.getRuntimeDisplay()).isEqualTo("170");
     }
 

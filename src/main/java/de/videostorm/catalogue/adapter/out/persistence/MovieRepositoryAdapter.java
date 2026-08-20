@@ -87,7 +87,7 @@ class MovieRepositoryAdapter implements MovieRepository {
 
     private static Movie toDomain(MovieEntity entity) {
         Optional<Rating> rating = entity.getRatingSource() != null && entity.getRatingValue() != null
-                ? Optional.of(new Rating(entity.getRatingSource(), entity.getRatingValue()))
+                ? Optional.of(new Rating(entity.getRatingSource(), entity.getRatingValue(), entity.getRatingVotes()))
                 : Optional.empty();
 
         return new Movie(

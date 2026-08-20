@@ -49,14 +49,14 @@ class ShowRowTest {
     @Test
     void aPresentRatingAndStatusAreFormatted() {
         Show show = new Show(1, "Breaking Bad", Year.of(2008), ShowStatus.ENDED,
-                Optional.of(new Rating("TVDB", new BigDecimal("9.5"))), GenreList.EMPTY, Optional.empty(),
+                Optional.of(new Rating("TVDB", new BigDecimal("9.5"), 1234)), GenreList.EMPTY, Optional.empty(),
                 5, 62, Optional.empty(), false, false);
 
         ShowRow row = ShowRow.from(show, 0, 1);
 
         assertThat(row.getYear()).isEqualTo("2008");
         assertThat(row.getStatusDisplay()).isEqualTo("ended");
-        assertThat(row.getRatingDisplay()).isEqualTo("9.5 (TVDB)");
+        assertThat(row.getRatingDisplay()).isEqualTo("9.5 (1.234 votes)");
     }
 
     @Test

@@ -39,6 +39,9 @@ class MovieEntity {
     @Column(name = "rating_value")
     private BigDecimal ratingValue;
 
+    @Column(name = "rating_votes")
+    private Integer ratingVotes;
+
     private String genres;
 
     @Column(name = "runtime_minutes")

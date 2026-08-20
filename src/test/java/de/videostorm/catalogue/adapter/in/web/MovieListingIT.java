@@ -287,15 +287,24 @@ class MovieListingIT extends PostgresIntegrationTestBase {
 
     @Test
     void rendersASeededMovieWithTitleYearRatingGenresAndRuntime() throws Exception {
-        insertMovie("Heat", 1995, "TMDB", new BigDecimal("7.8"), List.of("Crime", "Thriller"), 170);
+        insertMovie("Heat", 1995, "TMDB", new BigDecimal("7.8"), 1234, List.of("Crime", "Thriller"), 170);
 
         String html = render("/movies");
 
         assertThat(html).contains("<td>Heat</td>");
         assertThat(html).contains("<td>1995</td>");
-        assertThat(html).contains("<td>7.8 (TMDB)</td>");
+        assertThat(html).contains("<td>7.8 (1.234 votes)</td>");
         assertThat(html).contains("<td title=\"Crime, Thriller\">Crime, Thriller</td>");
         assertThat(html).contains("<td>170</td>");
+    }
+
+    @Test
+    void rendersARatingWithoutVoteCountAsTheBareValue() throws Exception {
+        insertMovie("Heat", 1995, "TMDB", new BigDecimal("7.8"), List.of("Crime", "Thriller"), 170);
+
+        String html = render("/movies");
+
+        assertThat(html).contains("<td>7.8</td>");
     }
 
     @Test
@@ -427,8 +436,8 @@ class MovieListingIT extends PostgresIntegrationTestBase {
 
     @Test
     void searchMatchesWhenTheNormalizedOriginalTitleContainsTheTerm() throws Exception {
-        insertMovie("El Cuerpo", "The Body", 2012, null, null, List.of(), null);
-        insertMovie("Unrelated Movie", null, 2012, null, null, List.of(), null);
+        insertMovie("El Cuerpo", "The Body", 2012, null, null, null, List.of(), null);
+        insertMovie("Unrelated Movie", null, 2012, null, null, null, List.of(), null);
 
         String html = render("/movies?q=body");
 
@@ -524,7 +533,13 @@ class MovieListingIT extends PostgresIntegrationTestBase {
     private void insertMovie(
             String title, Integer year, String ratingSource, BigDecimal ratingValue,
             List<String> genreValues, Integer runtimeMinutes) {
-        insertMovie(title, null, year, ratingSource, ratingValue, genreValues, runtimeMinutes);
+        insertMovie(title, null, year, ratingSource, ratingValue, null, genreValues, runtimeMinutes);
+    }
+
+    private void insertMovie(
+            String title, Integer year, String ratingSource, BigDecimal ratingValue, Integer ratingVotes,
+            List<String> genreValues, Integer runtimeMinutes) {
+        insertMovie(title, null, year, ratingSource, ratingValue, ratingVotes, genreValues, runtimeMinutes);
     }
 
     private void insertMovieWithResolutionAndImdb(String title, String resolution, String imdbId) {
@@ -581,7 +596,7 @@ class MovieListingIT extends PostgresIntegrationTestBase {
 
     private void insertMovie(
             String title, String originalTitle, Integer year, String ratingSource, BigDecimal ratingValue,
-            List<String> genreValues, Integer runtimeMinutes) {
+            Integer ratingVotes, List<String> genreValues, Integer runtimeMinutes) {
         String normalizedTitle = TitleNormalizer.normalize(title);
         String normalizedOriginalTitle = originalTitle == null ? null : TitleNormalizer.normalize(originalTitle);
         String genres = new GenreList(genreValues).toStorage();
@@ -589,11 +604,11 @@ class MovieListingIT extends PostgresIntegrationTestBase {
 
         jdbcTemplate.update("""
                 INSERT INTO movie (title, original_title, year, normalized_title, normalized_original_title,
-                                    rating_source, rating_value, genres, runtime_minutes, slug)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                    rating_source, rating_value, rating_votes, genres, runtime_minutes, slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 title, originalTitle, year == null ? 0 : year, normalizedTitle, normalizedOriginalTitle,
-                ratingSource, ratingValue, genres, runtimeMinutes, slug);
+                ratingSource, ratingValue, ratingVotes, genres, runtimeMinutes, slug);
     }
 
     private static int indexOf(String html, String title) {

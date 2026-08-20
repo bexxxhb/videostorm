@@ -41,6 +41,9 @@ class ShowEntity {
     @Column(name = "rating_value")
     private BigDecimal ratingValue;
 
+    @Column(name = "rating_votes")
+    private Integer ratingVotes;
+
     private String genres;
 
     private String plot;

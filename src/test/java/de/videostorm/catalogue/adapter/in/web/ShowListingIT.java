@@ -212,15 +212,24 @@ class ShowListingIT extends PostgresIntegrationTestBase {
 
     @Test
     void rendersASeededShowWithTitleYearStatusRatingAndGenres() throws Exception {
-        insertShow("Breaking Bad", 2008, "ENDED", "TVDB", new BigDecimal("9.5"), List.of("Crime", "Drama"));
+        insertShow("Breaking Bad", 2008, "ENDED", "TVDB", new BigDecimal("9.5"), 1234, List.of("Crime", "Drama"));
 
         String html = render("/shows");
 
         assertThat(html).contains("<td>Breaking Bad</td>");
         assertThat(html).contains("<td>2008</td>");
         assertThat(html).contains("<td>ended</td>");
-        assertThat(html).contains("<td>9.5 (TVDB)</td>");
+        assertThat(html).contains("<td>9.5 (1.234 votes)</td>");
         assertThat(html).contains("<td title=\"Crime, Drama\">Crime, Drama</td>");
+    }
+
+    @Test
+    void rendersAShowRatingWithoutVoteCountAsTheBareValue() throws Exception {
+        insertShow("Breaking Bad", 2008, "ENDED", "TVDB", new BigDecimal("9.5"), List.of("Crime", "Drama"));
+
+        String html = render("/shows");
+
+        assertThat(html).contains("<td>9.5</td>");
     }
 
     @Test
@@ -444,8 +453,8 @@ class ShowListingIT extends PostgresIntegrationTestBase {
 
     @Test
     void searchMatchesWhenTheNormalizedOriginalTitleContainsTheTerm() throws Exception {
-        insertShow("El Cuerpo", "The Body", 2012, "UNKNOWN", null, null, List.of());
-        insertShow("Unrelated Show", null, 2012, "UNKNOWN", null, null, List.of());
+        insertShow("El Cuerpo", "The Body", 2012, "UNKNOWN", null, null, null, List.of());
+        insertShow("Unrelated Show", null, 2012, "UNKNOWN", null, null, null, List.of());
 
         String html = render("/shows?q=body");
 
@@ -536,7 +545,13 @@ class ShowListingIT extends PostgresIntegrationTestBase {
     private void insertShow(
             String title, Integer year, String status, String ratingSource, BigDecimal ratingValue,
             List<String> genreValues) {
-        insertShow(title, null, year, status, ratingSource, ratingValue, genreValues);
+        insertShow(title, null, year, status, ratingSource, ratingValue, null, genreValues);
+    }
+
+    private void insertShow(
+            String title, Integer year, String status, String ratingSource, BigDecimal ratingValue,
+            Integer ratingVotes, List<String> genreValues) {
+        insertShow(title, null, year, status, ratingSource, ratingValue, ratingVotes, genreValues);
     }
 
     private long idOf(String title) {
@@ -591,7 +606,7 @@ class ShowListingIT extends PostgresIntegrationTestBase {
 
     private void insertShow(
             String title, String originalTitle, Integer year, String status, String ratingSource,
-            BigDecimal ratingValue, List<String> genreValues) {
+            BigDecimal ratingValue, Integer ratingVotes, List<String> genreValues) {
         String normalizedTitle = TitleNormalizer.normalize(title);
         String normalizedOriginalTitle = originalTitle == null ? null : TitleNormalizer.normalize(originalTitle);
         String genres = new GenreList(genreValues).toStorage();
@@ -599,11 +614,11 @@ class ShowListingIT extends PostgresIntegrationTestBase {
 
         jdbcTemplate.update("""
                 INSERT INTO show (title, original_title, year, normalized_title, normalized_original_title,
-                                   status, rating_source, rating_value, genres, slug)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                   status, rating_source, rating_value, rating_votes, genres, slug)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 title, originalTitle, year == null ? 0 : year, normalizedTitle, normalizedOriginalTitle,
-                status, ratingSource, ratingValue, genres, slug);
+                status, ratingSource, ratingValue, ratingVotes, genres, slug);
     }
 
     private String render(String path) throws Exception {
