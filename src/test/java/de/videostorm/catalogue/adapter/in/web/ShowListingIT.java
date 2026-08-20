@@ -255,7 +255,7 @@ class ShowListingIT extends PostgresIntegrationTestBase {
         String html = render("/shows");
 
         assertThat(html).contains(
-                "<a class=\"imdb-link\" href=\"https://www.imdb.com/title/tt0903747/\">info @ IMDB.com</a>");
+                "<a class=\"imdb-link\" href=\"https://www.imdb.com/title/tt0903747/\" target=\"_blank\" rel=\"noopener noreferrer\">info @ IMDB.com</a>");
     }
 
     @Test

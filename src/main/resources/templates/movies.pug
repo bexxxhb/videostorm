@@ -59,7 +59,7 @@ block content
               a.actors-link(href=movie.actorsUrl, data-title=movie.title) Actors
           td
             if movie.imdbUrl
-              a.imdb-link(href=movie.imdbUrl)= movie.imdbLinkText
+              a.imdb-link(href=movie.imdbUrl, target="_blank", rel="noopener noreferrer")= movie.imdbLinkText
           td
             if movie.hasRawNfo
               a.rawnfo-link(href=movie.rawNfoUrl, data-title=movie.title) Raw data
