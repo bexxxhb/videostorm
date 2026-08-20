@@ -56,6 +56,33 @@ class MovieListingIT extends PostgresIntegrationTestBase {
     }
 
     @Test
+    void aPlainRequestRendersTheFullPageAroundTheResults() throws Exception {
+        String html = render("/movies");
+
+        assertThat(html).contains("<html").contains("class=\"search\"").contains("id=\"results\"");
+    }
+
+    @Test
+    void anAjaxRequestRendersOnlyTheResultsFragment() throws Exception {
+        insertMovie("Heat", 1995, null, null, List.of(), null);
+
+        String html = renderFragment("/movies");
+
+        assertThat(html).doesNotContain("<html").doesNotContain("class=\"search\"");
+        assertThat(html).contains("<td>Heat</td>").contains("class=\"pagination\"");
+    }
+
+    @Test
+    void anAjaxRequestHonoursTheSearchQueryJustLikeAFullPageRequest() throws Exception {
+        insertMovie("Heat", 1995, null, null, List.of(), null);
+        insertMovie("Unrelated", 1995, null, null, List.of(), null);
+
+        String html = renderFragment("/movies?q=heat");
+
+        assertThat(html).contains("<td>Heat</td>").doesNotContain("<td>Unrelated</td>");
+    }
+
+    @Test
     void rendersEveryMovieColumnHeaderWithSortableOnesAsLinks() throws Exception {
         String html = render("/movies");
 
@@ -619,6 +646,14 @@ class MovieListingIT extends PostgresIntegrationTestBase {
 
     private String render(String path) throws Exception {
         return mockMvc.perform(get(path))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+    }
+
+    private String renderFragment(String path) throws Exception {
+        return mockMvc.perform(get(path).header("X-Requested-With", "XMLHttpRequest"))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()

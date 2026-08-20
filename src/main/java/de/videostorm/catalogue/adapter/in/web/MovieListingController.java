@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
@@ -30,6 +31,7 @@ public class MovieListingController {
             @RequestParam(name = "q", defaultValue = "") String query,
             @RequestParam(name = "sort", required = false) String sort,
             @RequestParam(name = "dir", required = false) String dir,
+            @RequestHeader(name = "X-Requested-With", required = false) String requestedWith,
             Model model) {
         MovieSort movieSort = MovieSort.fromParams(sort, dir);
         MoviePage moviePage = listMoviesQuery.list(page, query, movieSort);
@@ -52,6 +54,6 @@ public class MovieListingController {
                 moviePage.sort().field().param(), moviePage.sort().direction().param(), "/movies"));
         model.addAttribute("activeTab", "movies");
 
-        return "movies";
+        return "XMLHttpRequest".equals(requestedWith) ? "movies-results" : "movies";
     }
 }

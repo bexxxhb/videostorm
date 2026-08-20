@@ -1,0 +1,7 @@
+mixin searchBar(action, placeholder, query, sortField, sortDirection)
+  form.search(method="get", action=action)
+    input.search__input(type="search", name="q", value=query, placeholder=placeholder, autocomplete="off")
+    input(type="hidden", name="sort", value=sortField)
+    input(type="hidden", name="dir", value=sortDirection)
+    button.search__clear(type="button", aria-label="Clear search") ×
+    button.search__button(type="submit") Search

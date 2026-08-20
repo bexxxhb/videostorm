@@ -1,69 +1,9 @@
 extends layout
 
-include mixins/pagination
+include mixins/search-bar
 
 block content
-  form.search(method="get", action="/shows")
-    input.search__input(type="search", name="q", value=query, placeholder="Search title, genre or started")
-    input(type="hidden", name="sort", value=sort.field)
-    input(type="hidden", name="dir", value=sort.direction)
-    button.search__button(type="submit") Search
+  +searchBar("/shows", "Search title, genre or started", query, sort.field, sort.direction)
 
-  +pagination(pagination, pageNumber, totalPages, totalElements)
-
-  table.catalogue
-    colgroup
-      col.col--index
-      col.col--title
-      col.col--year
-      col.col--status
-      col.col--rating
-      col.col--genres
-      col.col--seasons
-      col.col--episodes
-      col.col--plot
-      col.col--actors
-      col.col--imdb
-      col.col--rawnfo
-    thead
-      tr
-        th #
-        th
-          a.sort-link(href=sort.title.url) Title !{sort.title.marker}
-        th
-          a.sort-link(href=sort.year.url) Started !{sort.year.marker}
-        th Status
-        th
-          a.sort-link(href=sort.rating.url) Rating !{sort.rating.marker}
-        th Genres
-        th Seasons
-        th Total Episodes
-        th Plot
-        th Actors
-        th IMDb
-        th nfo raw
-    tbody
-      each show in shows
-        tr(class=show.rowClass)
-          td= show.indexDisplay
-          td= show.title
-          td= show.year
-          td= show.statusDisplay
-          td= show.ratingDisplay
-          td(title=show.genresFullText)= show.genresDisplay
-          td= show.seasonsDisplay
-          td= show.episodesDisplay
-          td
-            if show.hasPlot
-              a.plot-link(href="#", data-plot=show.plotBase64, data-title=show.title) Plot
-          td
-            if show.hasActors
-              a.actors-link(href=show.actorsUrl, data-title=show.title) Actors
-          td
-            if show.imdbUrl
-              a.imdb-link(href=show.imdbUrl, target="_blank", rel="noopener noreferrer")= show.imdbLinkText
-          td
-            if show.hasRawNfo
-              a.rawnfo-link(href=show.rawNfoUrl, data-title=show.title) Raw data
-
-  +pagination(pagination, pageNumber, totalPages, totalElements)
+  div#results
+    include shows-results

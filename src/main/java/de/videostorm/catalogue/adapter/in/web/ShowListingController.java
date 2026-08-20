@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
@@ -30,6 +31,7 @@ public class ShowListingController {
             @RequestParam(name = "q", defaultValue = "") String query,
             @RequestParam(name = "sort", required = false) String sort,
             @RequestParam(name = "dir", required = false) String dir,
+            @RequestHeader(name = "X-Requested-With", required = false) String requestedWith,
             Model model) {
         ShowSort showSort = ShowSort.fromParams(sort, dir);
         ShowPage showPage = listShowsQuery.list(page, query, showSort);
@@ -52,6 +54,6 @@ public class ShowListingController {
                 showPage.sort().field().param(), showPage.sort().direction().param(), "/shows"));
         model.addAttribute("activeTab", "shows");
 
-        return "shows";
+        return "XMLHttpRequest".equals(requestedWith) ? "shows-results" : "shows";
     }
 }
