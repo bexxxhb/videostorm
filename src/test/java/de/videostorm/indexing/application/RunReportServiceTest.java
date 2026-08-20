@@ -76,7 +76,7 @@ class RunReportServiceTest {
         Optional<RunReportDownload> download = service.download(7L);
 
         assertThat(download).isPresent();
-        assertThat(download.get().filename()).isEqualTo("videostorm-run-20260811-093015.csv");
+        assertThat(download.get().filename()).isEqualTo("videostorm-run-20260811-113015.csv");
         String csv = new String(download.get().content(), StandardCharsets.UTF_8);
         assertThat(csv).startsWith("﻿type;issue type;path;title;field");
         assertThat(csv).contains("Movies;MISSING_FIELD;/m/Blob;The Blob;title");

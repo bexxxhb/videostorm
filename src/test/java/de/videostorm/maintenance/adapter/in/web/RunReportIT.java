@@ -71,7 +71,7 @@ class RunReportIT extends PostgresIntegrationTestBase {
         byte[] body = mockMvc.perform(get("/maintenance/runs/" + run.id() + "/report.csv").session(login()))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition",
-                        "attachment; filename=\"videostorm-run-20260811-093015.csv\""))
+                        "attachment; filename=\"videostorm-run-20260811-113015.csv\""))
                 .andReturn().getResponse().getContentAsByteArray();
 
         assertThat(body[0]).isEqualTo((byte) 0xEF);
