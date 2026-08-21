@@ -9,9 +9,12 @@ html(lang="en")
     link(rel="stylesheet", href="/css/videostorm.css")
   body
     header.masthead
-      a.masthead__brand(href="/") Videostorm
+      a.masthead__home(href="/", aria-label="Videostorm home")
       if maintenanceEnabled
-        a.masthead__link(href="/maintenance") Maintenance
+        if administratorAuthenticated
+          a.masthead__link(href="/maintenance") Maintenance
+        else
+          a.masthead__link#login-layer-trigger(href="/maintenance") Maintenance
     nav.tabs
       if activeTab === "movies"
         a.tab.tab--active(href="/movies") Movies
@@ -29,5 +32,26 @@ html(lang="en")
           h2.content-dialog__title
           button.content-dialog__close(type="button", aria-label="Close") ×
         .content-dialog__body
+    if maintenanceEnabled && !administratorAuthenticated
+      dialog.content-dialog#login-layer(data-login-failed=loginFailed)
+        .content-dialog__panel
+          .content-dialog__head
+            h2.content-dialog__title Sign in
+            button.content-dialog__close(type="button", aria-label="Close") ×
+          .content-dialog__body
+            if loginFailed
+              p.form__error Invalid username or password.
+            form.form(method="post", action="/login")
+              input(type="hidden", name=csrfParameterName, value=csrfToken)
+              input(type="hidden", name="returnTo", value=loginReturnPath)
+              label.field
+                span Username
+                input(type="text", name="username", autofocus)
+              label.field
+                span Password
+                input(type="password", name="password")
+              button.button(type="submit") Sign in
     script(src="/js/content-dialog.js", defer)
     script(src="/js/search.js", defer)
+    if maintenanceEnabled && !administratorAuthenticated
+      script(src="/js/login-layer.js", defer)

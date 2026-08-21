@@ -10,7 +10,6 @@ import de.videostorm.maintenance.application.port.in.DuplicateScanReports;
 import de.videostorm.maintenance.application.port.in.TriggerDuplicateScan;
 import de.videostorm.sources.domain.SourcePaths;
 import de.videostorm.sources.domain.SourceType;
-import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -71,9 +70,7 @@ public class MaintenanceController {
     }
 
     @GetMapping("/maintenance")
-    public String maintenance(HttpServletRequest request, Model model) {
-        CsrfViewAttributes.exposeTo(request, model);
-
+    public String maintenance(Model model) {
         // Active run and history come from one snapshot, so the page can never show a run as active
         // and settled at once — as two separate reads could when a scan settles between them.
         IndexingOverview overview = indexingStatus.overview();

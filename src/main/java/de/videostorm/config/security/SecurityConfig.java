@@ -46,6 +46,12 @@ public class SecurityConfig {
         if (maintenanceEnabled) {
             http.formLogin(form -> form
                             .loginPage("/login")
+                            // The header's sign-in layer posts here without a preceding GET to a
+                            // gated page, so there is no saved request to bounce back to; this is
+                            // the fallback target then. A saved request (the no-JS path through
+                            // /login) still wins over it.
+                            .defaultSuccessUrl("/maintenance", false)
+                            .failureHandler(new LoginLayerFailureHandler())
                             .permitAll())
                     .logout(logout -> logout
                             .logoutSuccessUrl("/")

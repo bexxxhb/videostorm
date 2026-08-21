@@ -6,6 +6,7 @@ block content
     p.form__error Invalid username or password.
   form.form(method="post", action="/login")
     input(type="hidden", name=csrfParameterName, value=csrfToken)
+    input(type="hidden", name="returnTo", value=loginReturnPath)
     label.field
       span Username
       input(type="text", name="username", autofocus)

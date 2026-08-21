@@ -13,22 +13,25 @@ body {
 
 .masthead {
     display: flex;
-    align-items: baseline;
+    align-items: flex-start;
     justify-content: space-between;
+    height: 150px;
     padding: 1rem 1.5rem;
+    background-image: url("/img/background/videostorm.header.aspect.ration.2.to.10.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
     border-bottom: 1px solid var(--rule);
 }
 
-.masthead__brand {
-    font-size: 1.25rem;
-    font-weight: 600;
-    text-decoration: none;
-    color: var(--ink);
+.masthead__home {
+    flex: 1;
+    align-self: stretch;
 }
 
 .masthead__link {
     text-decoration: none;
-    color: var(--accent);
+    color: #fff;
 }
 
 .tabs {
